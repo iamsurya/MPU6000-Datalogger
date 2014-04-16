@@ -1,0 +1,33 @@
+dump_values () { 
+ __var t1, filehandle1,ctr; 
+ filehandle1 = __openFile("C:\\Temp\\DataX.txt","w");
+ 
+ for(ctr = 0; ctr < 1024; ctr++)
+ {
+  t1 = Xdata[ctr];
+   __writeFile(filehandle1,t1);
+ __writeFileByte(filehandle1,0x0A);
+ }
+ 
+ __closeFile(filehandle1);
+
+ filehandle1 = __openFile("C:\\Temp\\DataY.txt","w");
+for(ctr = 0; ctr < 1024; ctr++)
+ {
+ 
+ t1 = Ydata[ctr];
+  __writeFile(filehandle1,t1);
+  __writeFileByte(filehandle1,0x0A);
+ }
+__closeFile(filehandle1);
+
+  filehandle1 = __openFile("C:\\Temp\\DataZ.txt","w");
+  for(ctr = 0; ctr < 1024; ctr++)
+ {
+  t1 = Zdata[ctr];
+  __writeFile(filehandle1,t1);
+ __writeFileByte(filehandle1,0x0A);
+ }
+ __message "Dump Complete"; 
+ 
+} 
