@@ -226,3 +226,7 @@ settings/SPI.wsdt
 SPI.dep
 SPI.ewp
 SPI.ewp
+SPI.dep
+settings/SPI.wsdt
+dataflash.c
+SPI.ewp
