@@ -213,3 +213,16 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+*.dep
+*.ewp
+*.wsdt
+*.bat
+*.dni
+*.dbgdt
+*.wsdt
+main - Copy.h
+settings/SPI.wsdt
+settings/SPI.wsdt
+SPI.dep
+SPI.ewp
+SPI.ewp

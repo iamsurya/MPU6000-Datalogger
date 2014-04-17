@@ -120,23 +120,4 @@
 #define MPU6000_66HZ 2
 #define MPU6000_50HZ 3
 
-
-struct mpu6000_raw_sensors
-{
-    int acc_x;
-    int acc_y;
-    int acc_z;
-    int gyro_x;
-    int gyro_y;
-    int gyro_z;
-    int temp;
-};
-
-extern struct mpu6000_raw_sensors mpu6000_raw_sensor_readings;
-
-void mpu6000_init();
-void mpu6000_update_sensor_readings();
-int mpu6000_is_moving();
-
-
 #endif // __MPU6000_H__
