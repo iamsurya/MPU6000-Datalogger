@@ -1,6 +1,6 @@
 #include "main.h"
 
-#define READMEM 0                               /* Set to 1 if you want to read data from memory */
+#define READMEM 1                               /* Set to 1 if you want to read data from memory */
 #define PAGESIZE 1020 				/* PageSize for current Memory is set to 1024, but 6 * 170 = 1020, so we use this for all counters */
 
 
@@ -54,18 +54,18 @@ void main(void)
   
   /* Enable SPI */
   
-  P3SEL |= (BIT1 + BIT2 + BIT3);        /* Peripheral function instead of I/O */
-  UCB0CTL0 = UCCKPL | UCMSB | UCMST | UCMODE_0 | UCSYNC; /* SPI Polarity = 1, MSB First, Master, 3 Pin Mode, Synchronous Comm. UCCKPH = 0 is ~SPIPhase*/
-  UCB0CTL1 = UCSSEL_2 | UCSWRST;         /* Clock from SMCLK; hold SPI in reset */
+  P5SEL |= (BIT1 + BIT2 + BIT3);        /* Peripheral function instead of I/O */
+  UCB1CTL0 = UCCKPL | UCMSB | UCMST | UCMODE_0 | UCSYNC; /* SPI Polarity = 1, MSB First, Master, 3 Pin Mode, Synchronous Comm. UCCKPH = 0 is ~SPIPhase*/
+  UCB1CTL1 = UCSSEL_2 | UCSWRST;         /* Clock from SMCLK; hold SPI in reset */
   
-  UCB0BR1 = 0x0;                          /* Upper byte of divider word */
-  UCB0BR0 = 0x1;                         /* Clock = SMCLK / 10 = 100 KHz */
+  UCB1BR1 = 0x0;                          /* Upper byte of divider word */
+  UCB1BR0 = 0x1;                         /* Clock = SMCLK / 10 = 100 KHz */
   
-  UCB0CTL1 &= ~UCSWRST;                 /* Remove SPI reset to enable it*/
+  UCB1CTL1 &= ~UCSWRST;                 /* Remove SPI reset to enable it*/
   
   /* Configure Pins for SPI. These commands might not be needed */
-  P3DIR |= nSS | mSS | SPI_SOMI | SPI_CLK;    /* Output on the pins */      
-  P3OUT |= nSS | mSS | SPI_SOMI | SPI_CLK;    /* Set pins to high */
+  P5DIR |= nSS | mSS | SPI_SOMI | SPI_CLK;    /* Output on the pins */      
+  P5OUT |= nSS | mSS | SPI_SOMI | SPI_CLK;    /* Set pins to high */
   __delay_cycles(0x80);
   
   
@@ -252,13 +252,13 @@ void JustDance()
 
 unsigned char _Sensor_write(unsigned char add, unsigned char val)
 {
-  P3OUT |= mSS;                         /* Deselect Select Memory as SPI slave */  
-  P3OUT &= ~nSS;                        /* Select Sensor as SPI Slave */
+  P5OUT |= mSS;                         /* Deselect Select Memory as SPI slave */  
+  P5OUT &= ~nSS;                        /* Select Sensor as SPI Slave */
   unsigned char RXCHAR = 0x00;
   
   RXCHAR = Sensor_TXRX(add, val);
   
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */        
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */        
   return RXCHAR;
 }
 
@@ -266,12 +266,12 @@ unsigned char _Sensor_read(unsigned char add)
 {
   
   unsigned char RXCHAR = 0x00;
-  P3OUT |= mSS;                         /* Deselect Select Memory as SPI slave */  
-  P3OUT &= ~nSS;                        /* Select Sensor as SPI Slave */
+  P5OUT |= mSS;                         /* Deselect Select Memory as SPI slave */  
+  P5OUT &= ~nSS;                        /* Select Sensor as SPI Slave */
   
   RXCHAR = Sensor_TXRX(add | MPU_READ, 0x00);
   
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */   
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */   
   return RXCHAR;
 }
 
@@ -279,18 +279,18 @@ unsigned char Sensor_TXRX(unsigned char add, unsigned char val)
 {
   unsigned char RXCHAR = 0x00;
           
-  while (!(IFG2 & UCB0TXIFG));          /* Wait for TXBUF to be empty */
+  while (!(UC1IFG & UCB1TXIFG));          /* Wait for TXBUF to be empty */
   
-  UCB0TXBUF = add;                      /* Send Address of Register  */
-  while(!(IFG2 & UCB0TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
-  while(!(IFG2 & UCB0RXIFG));           /* Wait for RXBUF to be full */     
-  RXCHAR = UCB0RXBUF;                   /* Read what is RX to clear buffer / flags*/
+  UCB1TXBUF = add;                      /* Send Address of Register  */
+  while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
+  while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */     
+  RXCHAR = UCB1RXBUF;                   /* Read what is RX to clear buffer / flags*/
   
   
-  UCB0TXBUF = val;                      /* Write the val */      
-  while(!(IFG2 & UCB0TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
-  while(!(IFG2 & UCB0RXIFG));           /* Wait for RXBUF to be full */  
-  RXCHAR = UCB0RXBUF;                     /* Read what is RX to clear buffer / flags*/
+  UCB1TXBUF = val;                      /* Write the val */      
+  while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
+  while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */  
+  RXCHAR = UCB1RXBUF;                     /* Read what is RX to clear buffer / flags*/
         
 
   
@@ -304,12 +304,12 @@ unsigned char Sensor_TXRX(unsigned char add, unsigned char val)
 unsigned char MEM_TXRX(unsigned char data)
 {
   unsigned char RXCHAR = 0x00;
-  while (!(IFG2 & UCB0TXIFG));          /* Wait for TXBUF to be empty */
+  while (!(UC1IFG & UCB1TXIFG));          /* Wait for TXBUF to be empty */
   
-  UCB0TXBUF = data;                      /* Send Address of Register  */
-  while(!(IFG2 & UCB0TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
-  while(!(IFG2 & UCB0RXIFG));           /* Wait for RXBUF to be full */     
-  RXCHAR = UCB0RXBUF;                   /* Read what is RX to clear buffer / flags*/
+  UCB1TXBUF = data;                      /* Send Address of Register  */
+  while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
+  while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */     
+  RXCHAR = UCB1RXBUF;                   /* Read what is RX to clear buffer / flags*/
   return RXCHAR;
   
 }
@@ -317,25 +317,25 @@ unsigned char MEM_TXRX(unsigned char data)
 unsigned char Mem_ReadID()
 {
   unsigned char RXCHAR = 0x00;
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
-  P3OUT &= ~mSS;                        /* Select Memory as SPI Slave */
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
   
   MEM_TXRX(0x9F);                       /* Send the Buffer OpCode to the Memory */
   RXCHAR = MEM_TXRX(0x00);                       /* Write 3 bytes of address. We starts at byte 0, so this is always 0 */
   RXCHAR = RXCHAR;
   
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   return RXCHAR;
 }
 
 void Mem_WriteToBuffer()
 {
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
   __delay_cycles(100);
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   __delay_cycles(100);
-  P3OUT &= ~mSS;                        /* Select Memory as SPI Slave */
+  P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
   __delay_cycles(100);
   MEM_TXRX(Buf1Write);                  /* Send the Buffer OpCode to the Memory */
   MEM_TXRX(0x00);                       /* Write 3 bytes of address. We starts at byte 0, so this is always 0 */
@@ -347,16 +347,16 @@ void Mem_WriteToBuffer()
     MEM_TXRX(SensorData1[ctr]);
   }
   
-  while(UCB0STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   __delay_cycles(100);
 }
 
 void Mem_ReadFromBuffer()
 {
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
-  P3OUT &= ~mSS;                        /* Select Memory as SPI Slave */
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
   
   MEM_TXRX(Buf1Read);                  /* Send the Buffer OpCode to the Memory */
   MEM_TXRX(0x00);                      /* Don't Care Bytes */
@@ -369,8 +369,8 @@ void Mem_ReadFromBuffer()
     SensorData2[ctr] = MEM_TXRX(0x00);
   }
   
-  while(UCB0STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   
 }
 
@@ -380,16 +380,16 @@ void Mem_BufferToPage()
   PageAddress_H = (unsigned char) (((CurrentPage<<3) & 0xFF00)>>8);
   PageAddress_L = (unsigned char) (((CurrentPage<<3) & 0xFF));
   
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
-  P3OUT &= ~mSS;                        /* Select Memory as SPI Slave */
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
   
   MEM_TXRX(Buf1ToFlashWE);                  /* Send the Buffer OpCode to the Memory */
   MEM_TXRX(PageAddress_H);                      /* Don't Care Bytes */
   MEM_TXRX(PageAddress_L);                      /* Upper and lower Byter. We starts at byte 0, so this is always 0 */
   MEM_TXRX(0x00);                      /* Lower Byte */
   
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
 }
 
 void Mem_ReadFromMem()
@@ -397,9 +397,9 @@ void Mem_ReadFromMem()
   PageAddress_H = (unsigned char) (((CurrentPage<<3) & 0xFF00)>>8);
   PageAddress_L = (unsigned char) (((CurrentPage<<3) & 0xFF));
   
-  P3OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
-  P3OUT &= ~mSS;                        /* Select Memory as SPI Slave */
+  P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
   
   MEM_TXRX(0xD2);                  /* Send the Buffer OpCode to the Memory */
   MEM_TXRX(PageAddress_H);                      /* Don't Care Bytes */
@@ -416,8 +416,8 @@ void Mem_ReadFromMem()
     SensorData2[ctr] = MEM_TXRX(0x00);
   }
   
-  while(UCB0STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
-  P3OUT |= mSS;                         /* Deselect memory as SPI slave */ 
+  while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
+  P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   
 }
 

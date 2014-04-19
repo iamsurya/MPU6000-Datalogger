@@ -230,3 +230,14 @@ SPI.dep
 settings/SPI.wsdt
 dataflash.c
 SPI.ewp
+SPI.dep
+SPI.dep
+SPI.ewp
+settings/SPI.wsdt
+*.wsdt
+*.wsdt
+settings/SPI.wsdt
+settings/SPI.wsdt
+SPI.dep
+SPI.ewd
+SPI.ewp
