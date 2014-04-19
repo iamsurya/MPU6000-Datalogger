@@ -1,31 +1,6 @@
 #include "main.h"
 
 #define READMEM 1                               /* Set to 1 if you want to read data from memory */
-#define PAGESIZE 1020 				/* PageSize for current Memory is set to 1024, but 6 * 170 = 1020, so we use this for all counters */
-
-
-
-/* Variables for SPI */
-unsigned char read = 0;
-unsigned char PageAddress_H = 0;
-unsigned char PageAddress_L = 0;
-
-/* Variables for Main Program and to store Data */
-unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between Blink / No Blink modes, 2 = Switch Blink Frequencies, 3 = SPI reading*/
-signed char SensorData1[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
-signed char SensorData2[PAGESIZE]; 	/* Data received from Memory */
-unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
-unsigned int ctr = 0;		/* Variable used for counters. Being Lazy */
-
-/* Timer for reading sensors */
-unsigned int BaseTime = 273; 	   /* Blinking frequency / timer on startup 0x1000 is 1 second */
-unsigned char ReadingSensor = 0x00; /* Flag is set if Timer interrupts an SPI operation */
-
-/* Variables to store Timer Counts to evaluate communication times */
-unsigned int StartTime = 0;
-unsigned int EndTime = 0;
-unsigned int Time = 0;
-
 
 
 
@@ -425,18 +400,90 @@ void Mem_ReadFromMem()
 /* Old function used when READMEM */
 void Mem_ReadAll()
 {
-	for(int p = 0; p < 10; p++)
-            {
-            CurrentPage = p;
-            for(ctr = 0; ctr < PAGESIZE; ctr++)
-            {
-            SensorData1[ctr] = 0;
-            SensorData2[ctr] = 0;
+    /* Initialize UART */
+    P3DIR = TXPIN;
+    P3OUT = TXPIN;
+    P3SEL = TXPIN | RXPIN;
+
+    UCA1CTL1 |= UCSSEL_1;                     // CLK = ACLK
+    UCA1BR0 = 0x03;                           // 32kHz/9600 = 3.41
+    UCA1BR1 = 0x00;
+    UCA1MCTL = UCBRS1 + UCBRS0;               // Modulation UCBRSx = 3
+    UCA1CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
+    /* End UART init */
     
-            }
-            Mem_ReadFromMem();
-            }
-    JustDance();
+    ClearScreen();
+  
+
+    CurrentPage = 0;
+    for(ctr = 0; ctr < PAGESIZE; ctr++)
+    {
+    SensorData1[ctr] = 0;
+    SensorData2[ctr] = 0;
+
+    }
+    Mem_ReadFromMem();
+
+    
+    for(ctr = 0; ctr < 85; ctr++)
+    {
+      for(int ctr2 = 0; ctr2 < 12; ctr2++)
+      {
+      SendValue(SensorData2[(ctr*12)+ctr2]);
+      UART_SendChar(' ');
+      
+      }
+      UART_SendChar(0x0A);
+      UART_SendChar(0x0D);
+    }
+    while(UCA1STAT & UCBUSY);
+    
+    UCA1CTL1 |= UCSWRST;
 	
-	
+    
+    while(1);                   // Trap program
+}
+
+void ClearScreen()
+{
+    UART_SendChar(RS232_ESC);
+    UART_SendChar('[');
+    UART_SendChar('2');
+    UART_SendChar('J');
+    
+    UART_SendChar(RS232_ESC);
+    UART_SendChar('[');
+    UART_SendChar('H');
+}
+
+void SendValue(signed char num)
+{
+  unsigned char p = 0;
+  
+  if(num < 0)   /* If Number is negative print negative sign and make num positive */
+  {
+    UART_SendChar('-');
+    num = -1 * num;
+  }
+  else
+  {
+    UART_SendChar(' ');
+    
+  }
+  p = (unsigned char) num / 100;
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 100);
+  p = (unsigned char) num / 10;
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 10);
+  p = (unsigned char) num;
+  UART_SendChar( p + ASCII0 );  
+  
+  
+}
+
+void UART_SendChar(unsigned char data)
+{ 
+  while(!(UC1IFG & UCA1TXIFG));
+  UCA1TXBUF = data;  
 }
