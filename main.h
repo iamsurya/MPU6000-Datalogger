@@ -45,7 +45,10 @@ unsigned int StartTime = 0;
 unsigned int EndTime = 0;
 unsigned int Time = 0;
 
-
+/* Variables for logging to UART */
+unsigned long ReadIndex = 0;
+char PhoneViewStart[] = "START 2014-21-04   07:30:20";
+char PhoneViewEnd[] = "END 2014-21-04   20:05:05";
 
 
 /* Functions */
@@ -71,6 +74,6 @@ void Mem_ReadAll();
 /* UART Functions */
 
 void ClearScreen();
-void SendValue(signed char);
+void UART_SendValue(signed char);
 void UART_SendChar(unsigned char);
-
+void UART_SendIndex(unsigned long num);

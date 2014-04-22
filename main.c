@@ -414,28 +414,48 @@ void Mem_ReadAll()
     
     ClearScreen();
   
-
-    CurrentPage = 0;
-    for(ctr = 0; ctr < PAGESIZE; ctr++)
+    for(ctr = 0; ctr < sizeof(PhoneViewStart); ctr++)
     {
-    SensorData1[ctr] = 0;
-    SensorData2[ctr] = 0;
-
+      UART_SendChar(PhoneViewStart[ctr]);
     }
-    Mem_ReadFromMem();
+    UART_SendChar(0x0D);
 
-    
-    for(ctr = 0; ctr < 85; ctr++)
+    for(CurrentPage = 0; CurrentPage < 27; CurrentPage++)
     {
-      for(int ctr2 = 0; ctr2 < 12; ctr2++)
+      for(ctr = 0; ctr < PAGESIZE; ctr++)
       {
-      SendValue(SensorData2[(ctr*12)+ctr2]);
-      UART_SendChar(' ');
-      
+          SensorData1[ctr] = 0;
+          SensorData2[ctr] = 0;
+
       }
-      UART_SendChar(0x0A);
-      UART_SendChar(0x0D);
+      Mem_ReadFromMem();
+      
+      for(ctr = 0; ctr < 170; ctr++)
+      {
+        UART_SendIndex(ReadIndex++);              /* Time Index to work with Phoneview */
+        UART_SendChar(' ');
+        
+        UART_SendValue(123);              /* Junk to work with Phoneview */
+        UART_SendChar(' ');
+        
+        UART_SendValue(123);              /* Junk to work with Phoneview */
+        UART_SendChar(' ');
+        
+        UART_SendValue(123);              /* Junk to work with Phoneview */
+        UART_SendChar(' ');
+        
+        for(int ctr2 = 0; ctr2 < 6; ctr2++)
+        {
+        UART_SendValue(SensorData2[(ctr*6)+ctr2]);
+        UART_SendChar(' ');
+        
+        }
+        //UART_SendChar(0x0A);
+        UART_SendChar(0x0D);
+      }
+
     }
+    
     while(UCA1STAT & UCBUSY);
     
     UCA1CTL1 |= UCSWRST;
@@ -456,7 +476,7 @@ void ClearScreen()
     UART_SendChar('H');
 }
 
-void SendValue(signed char num)
+void UART_SendValue(signed char num)
 {
   unsigned char p = 0;
   
@@ -481,6 +501,36 @@ void SendValue(signed char num)
   
   
 }
+
+void UART_SendIndex(unsigned long num)
+{
+  unsigned char p = 0;
+  
+  p = (unsigned char) (num / 10000);
+  
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 10000);
+  
+  
+  p = (unsigned char) (num / 1000);
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 1000);  
+  
+  
+  p = (unsigned char) (num / 100);
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 100);
+  p = (unsigned char) (num / 10);
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 10);
+  p = (unsigned char) num;
+  UART_SendChar( p + ASCII0 );  
+  
+  
+}
+
+
+
 
 void UART_SendChar(unsigned char data)
 { 
