@@ -1,5 +1,5 @@
 #include "main.h"
-
+#include "math.h"
 #define READMEM 1                               /* Set to 1 if you want to read data from memory */
 
 
@@ -125,7 +125,18 @@ void main(void)
     {
       ReadingSensor = 1;
       
-      
+      if(CurrentPage == 8190 && ctr > 1007)
+      {
+      SensorData1[ctr++] = -128;
+      SensorData1[ctr++] = -128;
+      SensorData1[ctr++] = -128;
+      SensorData1[ctr++] = -128;
+      SensorData1[ctr++] = -128;
+      SensorData1[ctr++] = -128;
+      JustDance();
+      }
+      else
+      {
       /* Read X Acc */
       SensorData1[ctr++] = _Sensor_read(MPUREG_ACCEL_XOUT_H); // rand--;//
       /* Read Y Acc */
@@ -139,6 +150,7 @@ void main(void)
       /* Read Z Gyro */
       SensorData1[ctr++] = _Sensor_read(MPUREG_GYRO_ZOUT_H);
       
+      }
       
 
           if(ctr >= PAGESIZE)   /* The Buffer is full */
@@ -352,8 +364,8 @@ void Mem_ReadFromBuffer()
 void Mem_BufferToPage()
 {
   
-  PageAddress_H = (unsigned char) (((CurrentPage<<3) & 0xFF00)>>8);
-  PageAddress_L = (unsigned char) (((CurrentPage<<3) & 0xFF));
+  PageAddress_H = (unsigned char) (((CurrentPage<<2) & 0xFF00)>>8);
+  PageAddress_L = (unsigned char) (((CurrentPage<<2) & 0xFF));
   
   P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
@@ -369,8 +381,8 @@ void Mem_BufferToPage()
 
 void Mem_ReadFromMem()
 {
-  PageAddress_H = (unsigned char) (((CurrentPage<<3) & 0xFF00)>>8);
-  PageAddress_L = (unsigned char) (((CurrentPage<<3) & 0xFF));
+  PageAddress_H = (unsigned char) (((CurrentPage<<2) & 0xFF00)>>8);
+  PageAddress_L = (unsigned char) (((CurrentPage<<2) & 0xFF));
   
   P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
@@ -398,7 +410,7 @@ void Mem_ReadFromMem()
 
 
 /* Old function used when READMEM */
-void Mem_ReadAll()
+void Mem_ReadAllBinary()
 {
     /* Initialize UART */
     P3DIR = TXPIN;
@@ -411,7 +423,9 @@ void Mem_ReadAll()
     UCA1MCTL = UCBRS1 + UCBRS0;               // Modulation UCBRSx = 3
     UCA1CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
     /* End UART init */
-    
+ 
+ /* Don't need this b/c sending binary dump */
+/* 
     ClearScreen();
   
     for(ctr = 0; ctr < sizeof(PhoneViewStart); ctr++)
@@ -419,8 +433,8 @@ void Mem_ReadAll()
       UART_SendChar(PhoneViewStart[ctr]);
     }
     UART_SendChar(0x0D);
-
-    for(CurrentPage = 0; CurrentPage < 27; CurrentPage++)
+*/
+    for(CurrentPage = 0; CurrentPage < 8190; CurrentPage++)
     {
       for(ctr = 0; ctr < PAGESIZE; ctr++)
       {
@@ -432,26 +446,28 @@ void Mem_ReadAll()
       
       for(ctr = 0; ctr < 170; ctr++)
       {
-        UART_SendIndex(ReadIndex++);              /* Time Index to work with Phoneview */
-        UART_SendChar(' ');
+       
+		// UART_SendTime(ReadIndex++);              /* Time Index to work with Phoneview */
+        // UART_SendChar(' ');
         
-        UART_SendValue(123);              /* Junk to work with Phoneview */
-        UART_SendChar(' ');
+        // UART_SendValue(123);              /* Junk to work with Phoneview */
+        // UART_SendChar(' ');
         
-        UART_SendValue(123);              /* Junk to work with Phoneview */
-        UART_SendChar(' ');
+        // UART_SendValue(123);              /* Junk to work with Phoneview */
+        // UART_SendChar(' ');
         
-        UART_SendValue(123);              /* Junk to work with Phoneview */
-        UART_SendChar(' ');
+        // UART_SendValue(123);              /* Junk to work with Phoneview */
+        // UART_SendChar(' ');
         
         for(int ctr2 = 0; ctr2 < 6; ctr2++)
         {
-        UART_SendValue(SensorData2[(ctr*6)+ctr2]);
-        UART_SendChar(' ');
+        // UART_SendValue(SensorData2[(ctr*6)+ctr2]);
+        // UART_SendChar(' ');
+		UART_SendChar(SensorData2[(ctr*6)+ctr2]);
         
         }
         //UART_SendChar(0x0A);
-        UART_SendChar(0x0D);
+        // UART_SendChar(0x0D);
       }
 
     }
@@ -490,7 +506,9 @@ void UART_SendValue(signed char num)
     UART_SendChar(' ');
     
   }
+
   p = (unsigned char) num / 100;
+
   UART_SendChar( p + ASCII0 );
   num = num - (p * 100);
   p = (unsigned char) num / 10;
@@ -502,34 +520,63 @@ void UART_SendValue(signed char num)
   
 }
 
-void UART_SendIndex(unsigned long num)
+void UART_SendValue2(unsigned char num)
 {
   unsigned char p = 0;
-  
-  p = (unsigned char) (num / 10000);
-  
-  UART_SendChar( p + ASCII0 );
-  num = num - (p * 10000);
-  
-  
-  p = (unsigned char) (num / 1000);
-  UART_SendChar( p + ASCII0 );
-  num = num - (p * 1000);  
-  
-  
-  p = (unsigned char) (num / 100);
-  UART_SendChar( p + ASCII0 );
-  num = num - (p * 100);
-  p = (unsigned char) (num / 10);
+  p = (unsigned char) num / 10;
   UART_SendChar( p + ASCII0 );
   num = num - (p * 10);
   p = (unsigned char) num;
   UART_SendChar( p + ASCII0 );  
+}
+
+void UART_SendIndex(unsigned long num)
+{
+  unsigned char p = 0;
+  unsigned char ZeroLocation = 0;
+  
+  p = (unsigned char) (num / 10000);
+ 
+  
+  UART_SendChar( p == 0 ? ' ' : (p + ASCII0) );
+  num = num - (p * 10000);
+  if( p != 0) ZeroLocation = 5;
+  
+  p = (unsigned char) (num / 1000);
+  
+  UART_SendChar((p == 0 && ZeroLocation <5) ? ' ' : (p + ASCII0) );
+  num = num - (p * 1000);  
+  if( p != 0) ZeroLocation = 4;
+  
+  p = (unsigned char) (num / 100);
+  UART_SendChar((p == 0 && ZeroLocation <4 )? ' ' : (p + ASCII0) );
+  num = num - (p * 100);
+  if( p != 0) ZeroLocation = 3;
+  
+  p = (unsigned char) (num / 10);
+  UART_SendChar((p == 0 && ZeroLocation <3 ) ? ' ' : (p + ASCII0 ));
+  num = num - (p * 10);
+  if( p != 0) ZeroLocation = 2;
+  
+  p = (unsigned char) num;
+  UART_SendChar((p == 0 && ZeroLocation <2 ) ? ' ' : (p + ASCII0 ));  
   
   
 }
 
-
+void UART_SendTime(unsigned long index)
+{
+  float time = index * 0.07;
+  unsigned long time_seconds = (unsigned long) floor(time);
+  time = time - time_seconds;
+  time = time * 100;
+  
+  UART_SendIndex(time_seconds);
+  UART_SendChar('.');
+  time_seconds = (unsigned long) time;
+  UART_SendValue2((unsigned char) time_seconds);
+  
+}
 
 
 void UART_SendChar(unsigned char data)

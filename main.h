@@ -77,3 +77,5 @@ void ClearScreen();
 void UART_SendValue(signed char);
 void UART_SendChar(unsigned char);
 void UART_SendIndex(unsigned long num);
+void UART_SendTime(unsigned long index);
+void UART_SendValue2(unsigned char num);
