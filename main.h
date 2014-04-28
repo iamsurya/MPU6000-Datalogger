@@ -69,7 +69,7 @@ void Mem_WriteToBuffer();
 void Mem_ReadFromBuffer();
 void Mem_ReadFromMem();
 void Mem_BufferToPage();
-void Mem_ReadAll();
+
 void Mem_ReadAllBinary();
 
 /* UART Functions */
@@ -80,3 +80,107 @@ void UART_SendChar(unsigned char);
 void UART_SendIndex(unsigned long num);
 void UART_SendTime(unsigned long index);
 void UART_SendValue2(unsigned char num);
+
+
+/******************************************/
+/*              Unwated Fn's              */
+//
+//
+//
+//void UART_SendValue(signed char num)
+//{
+//  unsigned char p = 0;
+//  
+//  if(num < 0)   /* If Number is negative print negative sign and make num positive */
+//  {
+//    UART_SendChar('-');
+//    num = -1 * num;
+//  }
+//  else
+//  {
+//    UART_SendChar(' ');
+//    
+//  }
+//
+//  p = (unsigned char) num / 100;
+//
+//  UART_SendChar( p + ASCII0 );
+//  num = num - (p * 100);
+//  p = (unsigned char) num / 10;
+//  UART_SendChar( p + ASCII0 );
+//  num = num - (p * 10);
+//  p = (unsigned char) num;
+//  UART_SendChar( p + ASCII0 );  
+//  
+//  
+//}
+//
+//void UART_SendValue2(unsigned char num)
+//{
+//  unsigned char p = 0;
+//  p = (unsigned char) num / 10;
+//  UART_SendChar( p + ASCII0 );
+//  num = num - (p * 10);
+//  p = (unsigned char) num;
+//  UART_SendChar( p + ASCII0 );  
+//}
+//
+//void UART_SendIndex(unsigned long num)
+//{
+//  unsigned char p = 0;
+//  unsigned char ZeroLocation = 0;
+//  
+//  p = (unsigned char) (num / 10000);
+// 
+//  
+//  UART_SendChar( p == 0 ? ' ' : (p + ASCII0) );
+//  num = num - (p * 10000);
+//  if( p != 0) ZeroLocation = 5;
+//  
+//  p = (unsigned char) (num / 1000);
+//  
+//  UART_SendChar((p == 0 && ZeroLocation <5) ? ' ' : (p + ASCII0) );
+//  num = num - (p * 1000);  
+//  if( p != 0) ZeroLocation = 4;
+//  
+//  p = (unsigned char) (num / 100);
+//  UART_SendChar((p == 0 && ZeroLocation <4 )? ' ' : (p + ASCII0) );
+//  num = num - (p * 100);
+//  if( p != 0) ZeroLocation = 3;
+//  
+//  p = (unsigned char) (num / 10);
+//  UART_SendChar((p == 0 && ZeroLocation <3 ) ? ' ' : (p + ASCII0 ));
+//  num = num - (p * 10);
+//  if( p != 0) ZeroLocation = 2;
+//  
+//  p = (unsigned char) num;
+//  UART_SendChar((p == 0 && ZeroLocation <2 ) ? ' ' : (p + ASCII0 ));  
+//  
+//  
+//}
+//
+//void UART_SendTime(unsigned long index)
+//{
+//  float time = index * 0.07;
+//  unsigned long time_seconds = (unsigned long) floor(time);
+//  time = time - time_seconds;
+//  time = time * 100;
+//  
+//  UART_SendIndex(time_seconds);
+//  UART_SendChar('.');
+//  time_seconds = (unsigned long) time;
+//  UART_SendValue2((unsigned char) time_seconds);
+//  
+//}
+//
+//void ClearScreen()
+//{
+//    UART_SendChar(RS232_ESC);
+//    UART_SendChar('[');
+//    UART_SendChar('2');
+//    UART_SendChar('J');
+//    
+//    UART_SendChar(RS232_ESC);
+//    UART_SendChar('[');
+//    UART_SendChar('H');
+//}
