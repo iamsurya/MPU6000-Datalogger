@@ -2,8 +2,11 @@
 #include "math.h"
 #define READMEM 1                               /* Set to 1 if you want to read data from memory */
 
+#define TIMETOWRITE 60
+#define TIMETOREAD 60
 
-
+#define PAGESTOWRITE 300 // (TIMETOWRITE * 5.5)
+#define PAGESTOREAD 300 //(TIMETOREAD * 5.5)
 
 
 /*
@@ -51,7 +54,7 @@ void main(void)
   /* This Part of the Program executes only if READMEM is 1 */
   if(READMEM)
   {
-    Mem_ReadAll();
+    Mem_ReadAllBinary();
   }
   
   /* Disable I2C on the sensor */
@@ -125,7 +128,7 @@ void main(void)
     {
       ReadingSensor = 1;
       
-      if(CurrentPage == 8190 && ctr > 1007)
+      if(CurrentPage == PAGESTOWRITE && ctr > 1007)
       {
       SensorData1[ctr++] = -128;
       SensorData1[ctr++] = -128;
@@ -149,7 +152,6 @@ void main(void)
       SensorData1[ctr++] = _Sensor_read(MPUREG_GYRO_YOUT_H);
       /* Read Z Gyro */
       SensorData1[ctr++] = _Sensor_read(MPUREG_GYRO_ZOUT_H);
-      
       }
       
 
@@ -416,25 +418,17 @@ void Mem_ReadAllBinary()
     P3DIR = TXPIN;
     P3OUT = TXPIN;
     P3SEL = TXPIN | RXPIN;
-
-    UCA1CTL1 |= UCSSEL_1;                     // CLK = ACLK
-    UCA1BR0 = 0x03;                           // 32kHz/9600 = 3.41
+    
+    /* Values from MSP430x24x Demo - USCI_A0, 115200 UART Echo ISR, DCO SMCLK */
+    
+    UCA1CTL1 |= UCSSEL_2;                     // CLK = ACLK
+    UCA1BR0 = 8;                           // 32kHz/9600 = 3.41
     UCA1BR1 = 0x00;
-    UCA1MCTL = UCBRS1 + UCBRS0;               // Modulation UCBRSx = 3
+    UCA1MCTL = UCBRS2 + UCBRS0;               // Modulation UCBRSx = 3
     UCA1CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
     /* End UART init */
  
- /* Don't need this b/c sending binary dump */
-/* 
-    ClearScreen();
-  
-    for(ctr = 0; ctr < sizeof(PhoneViewStart); ctr++)
-    {
-      UART_SendChar(PhoneViewStart[ctr]);
-    }
-    UART_SendChar(0x0D);
-*/
-    for(CurrentPage = 0; CurrentPage < 8190; CurrentPage++)
+    for(CurrentPage = 0; CurrentPage < PAGESTOREAD ; CurrentPage++)
     {
       for(ctr = 0; ctr < PAGESIZE; ctr++)
       {
@@ -445,31 +439,8 @@ void Mem_ReadAllBinary()
       Mem_ReadFromMem();
       
       for(ctr = 0; ctr < 170; ctr++)
-      {
-       
-		// UART_SendTime(ReadIndex++);              /* Time Index to work with Phoneview */
-        // UART_SendChar(' ');
-        
-        // UART_SendValue(123);              /* Junk to work with Phoneview */
-        // UART_SendChar(' ');
-        
-        // UART_SendValue(123);              /* Junk to work with Phoneview */
-        // UART_SendChar(' ');
-        
-        // UART_SendValue(123);              /* Junk to work with Phoneview */
-        // UART_SendChar(' ');
-        
         for(int ctr2 = 0; ctr2 < 6; ctr2++)
-        {
-        // UART_SendValue(SensorData2[(ctr*6)+ctr2]);
-        // UART_SendChar(' ');
 		UART_SendChar(SensorData2[(ctr*6)+ctr2]);
-        
-        }
-        //UART_SendChar(0x0A);
-        // UART_SendChar(0x0D);
-      }
-
     }
     
     while(UCA1STAT & UCBUSY);
@@ -477,7 +448,7 @@ void Mem_ReadAllBinary()
     UCA1CTL1 |= UCSWRST;
 	
     
-    while(1);                   // Trap program
+    JustDance();              // Trap program
 }
 
 void ClearScreen()

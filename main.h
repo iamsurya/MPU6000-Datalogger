@@ -70,6 +70,7 @@ void Mem_ReadFromBuffer();
 void Mem_ReadFromMem();
 void Mem_BufferToPage();
 void Mem_ReadAll();
+void Mem_ReadAllBinary();
 
 /* UART Functions */
 
