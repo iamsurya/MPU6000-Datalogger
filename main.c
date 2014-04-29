@@ -1,12 +1,12 @@
 #include "main.h"
-#include "math.h"
+
 #define READMEM 1                               /* Set to 1 if you want to read data from memory */
 
 #define TIMETOWRITE 60
 #define TIMETOREAD 60
 
-#define PAGESTOWRITE 300 // (TIMETOWRITE * 5.5)
-#define PAGESTOREAD 300 //(TIMETOREAD * 5.5)
+#define PAGESTOWRITE 317 // (TIMETOWRITE * 5.5)
+#define PAGESTOREAD 317 //(TIMETOREAD * 5.5)
 
 
 /*
@@ -20,18 +20,18 @@ void main(void)
   /* Turn off Watchdog Timer */
   WDTCTL = WDTPW+WDTHOLD;                   
 
+  BCSCTL3 |= XCAP_3;          /* Set the capacitance of the external crystal to 12.4pf. */  
+  
    /* Initialize DCO */
   BCSCTL1 = CALBC1_1MHZ;                /* Set DCO to 1MHz */
   DCOCTL =  CALDCO_1MHZ;                /* Set DCO to 1MHz */
   __delay_cycles(200000);	// Delay 0.2 s to let clocks settle
   
   /* Enable and Turn LED ON */
-  
   P1DIR |=LED;                          /* Set LED pin as Output */        
   P1OUT |=LED;                          /* Set LED pin as HIGH */
   
   /* Enable SPI */
-  
   P5SEL |= (BIT1 + BIT2 + BIT3);        /* Peripheral function instead of I/O */
   UCB1CTL0 = UCCKPL | UCMSB | UCMST | UCMODE_0 | UCSYNC; /* SPI Polarity = 1, MSB First, Master, 3 Pin Mode, Synchronous Comm. UCCKPH = 0 is ~SPIPhase*/
   UCB1CTL1 = UCSSEL_2 | UCSWRST;         /* Clock from SMCLK; hold SPI in reset */
@@ -49,7 +49,6 @@ void main(void)
   
   /* Read the Memory Device ID. Should be 1F */
   read = Mem_ReadID();
-  read = read;
   
   /* This Part of the Program executes only if READMEM is 1 */
   if(READMEM)
@@ -62,25 +61,18 @@ void main(void)
   
   /* Check the Sensor Device ID */
   read = _Sensor_read(MPUREG_WHOAMI);
-  read = read;
   
   /* Trap uC if Sensor doesn't ID correctly */
-  if(read != 0x68)                      /* Check WHOAMI Hopefully it is 0x68. Otherwise freak out. */
-  {
-    JustDance();
-  }
-  
+  if(read != 0x68)  JustDance();                    /* Check WHOAMI Hopefully it is 0x68. Otherwise freak out. */
+
   /* Sensor might be sleeping, read Register with Sleep Bit, reset the bit and write it back */
   read = _Sensor_read(MPUREG_PWR_MGMT_1);
   _Sensor_write(MPUREG_PWR_MGMT_1, (read & ~BIT_SLEEP));/* Reset the Sleep Bit to wake it up */
   
   /* Erase all data SensorData */
   for(ctr = 0; ctr < PAGESIZE; ctr++)
-  {
-    SensorData1[ctr] = 0;
-    SensorData2[ctr] = 0;
-    
-  }
+    SensorData[ctr] = 0;
+
   
   /* Reset Counter to 0 after previous for loop */
   ctr = 0;
@@ -94,7 +86,7 @@ void main(void)
   */
   TACTL = TACLR;
   __delay_cycles(8254); /* Delay by 0.2 seconds DELAY CYCLES USES DCO @ 1MHZ*/
-  TACTL = TASSEL_1 | MC_2 | ID_3;
+  TACTL = TASSEL_1 | MC_2;
   
     /* Other Housekeepigng */
   __delay_cycles(8234);                 /* Delay 0.2s at 1Mhz to let clock settle */
@@ -112,15 +104,11 @@ void main(void)
     
     if(ActionMode == 1)                 /* Long Buttton Press from old Timer Code */
     {
-      
-    ActionMode = 0;  
+      ActionMode = 0;  
     }
-    
     
     if(ActionMode == 2)                 /* Short Button Press from old Timer Code */
     {
-      
-      
       ActionMode = 0;
     }    
     
@@ -128,50 +116,49 @@ void main(void)
     {
       ReadingSensor = 1;
       
-      if(CurrentPage == PAGESTOWRITE && ctr > 1007)
+      if(CurrentPage == PAGESTOWRITE && ctr > 1007) /* 2nd to Last data should be -128, Last Should be 0 */
       {
-      SensorData1[ctr++] = -128;
-      SensorData1[ctr++] = -128;
-      SensorData1[ctr++] = -128;
-      SensorData1[ctr++] = -128;
-      SensorData1[ctr++] = -128;
-      SensorData1[ctr++] = -128;
+      SensorData[ctr++] = -128;
+      SensorData[ctr++] = -128;
+      SensorData[ctr++] = -128;
+      SensorData[ctr++] = -128;
+      SensorData[ctr++] = -128;
+      SensorData[ctr++] = -128;
       JustDance();
       }
       else
       {
       /* Read X Acc */
-      SensorData1[ctr++] = _Sensor_read(MPUREG_ACCEL_XOUT_H); // rand--;//
+      SensorData[ctr++] = _Sensor_read(MPUREG_ACCEL_XOUT_H); // rand--;//
       /* Read Y Acc */
-      SensorData1[ctr++] =  _Sensor_read(MPUREG_ACCEL_YOUT_H);
+      SensorData[ctr++] =  _Sensor_read(MPUREG_ACCEL_YOUT_H);
       /* Read Z Acc */
-      SensorData1[ctr++] =  _Sensor_read(MPUREG_ACCEL_ZOUT_H);
+      SensorData[ctr++] =  _Sensor_read(MPUREG_ACCEL_ZOUT_H);
       /* Read X Gyro */
-      SensorData1[ctr++] =  _Sensor_read(MPUREG_GYRO_XOUT_H);
+      SensorData[ctr++] =  _Sensor_read(MPUREG_GYRO_XOUT_H);
       /* Read Y Gyro */
-      SensorData1[ctr++] = _Sensor_read(MPUREG_GYRO_YOUT_H);
+      SensorData[ctr++] = _Sensor_read(MPUREG_GYRO_YOUT_H);
       /* Read Z Gyro */
-      SensorData1[ctr++] = _Sensor_read(MPUREG_GYRO_ZOUT_H);
+      SensorData[ctr++] = _Sensor_read(MPUREG_GYRO_ZOUT_H);
       }
       
 
           if(ctr >= PAGESIZE)   /* The Buffer is full */
           {
-           
             __disable_interrupt();	/* Disable interrupts b/c the timer might interrupt otherwise */
             StartTime = TAR;
             Mem_WriteToBuffer();	/* Write the stored SensorData to the Memory chip Buffer */
             Mem_BufferToPage();		/* Write the Buffer data to Page. Page Number is stored in Global CurrentPage */
             CurrentPage++;			/* Increment current page for next write */
-			ctr=0;					/* Reset ctr so its starts at 0 for next page */
+            ctr=0;					/* Reset ctr so its starts at 0 for next page */
             EndTime = TAR;
             Time = EndTime - StartTime;
             for(int actr = 0; actr < PAGESIZE; actr++)	/* Erase SensorData. Using new ctr variable b/c ctr is used in loop above */
-            {
-              SensorData1[actr] = 0;
-            }
+                SensorData[actr] = 0;
+            ReadingSensor = 0; /* Flag set to 0 b/c we're done with communication */
+            ActionMode = 0;
             
-              __enable_interrupt();	/* Enable Interrupts for the timer to start logging data again */
+            __enable_interrupt();	/* Enable Interrupts for the timer to start logging data again */
 
           }
       
@@ -195,6 +182,7 @@ void main(void)
 __interrupt void TA0V_ISR(void)
 {
   __disable_interrupt();
+  BaseTime ^= 0x01;             /* Flip between 2184 and 2185 to average at 2184.5 */
   TACCR0 += (BaseTime); /* Next Interrupt at given time */
   ActionMode = 3;
   if(ReadingSensor == 1)
@@ -332,9 +320,8 @@ void Mem_WriteToBuffer()
   MEM_TXRX(0x00);
   
   for(ctr = 0; ctr < PAGESIZE; ctr++)
-  {
-    MEM_TXRX(SensorData1[ctr]);
-  }
+    MEM_TXRX(SensorData[ctr]);
+
   
   while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
@@ -354,10 +341,8 @@ void Mem_ReadFromBuffer()
   
   
   for(ctr = 0; ctr < PAGESIZE; ctr++)
-  {
-    SensorData2[ctr] = MEM_TXRX(0x00);
-  }
-  
+      SensorData[ctr] = MEM_TXRX(0x00);
+
   while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
   
@@ -401,9 +386,7 @@ void Mem_ReadFromMem()
   MEM_TXRX(0x00);                       /* Dummy Byte */
   
   for(ctr = 0; ctr < PAGESIZE; ctr++)
-  {
-    SensorData2[ctr] = MEM_TXRX(0x00);
-  }
+      SensorData[ctr] = MEM_TXRX(0x00);
   
   while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
@@ -414,6 +397,7 @@ void Mem_ReadFromMem()
 /* Old function used when READMEM */
 void Mem_ReadAllBinary()
 {
+
     /* Initialize UART */
     P3DIR = TXPIN;
     P3OUT = TXPIN;
@@ -431,16 +415,13 @@ void Mem_ReadAllBinary()
     for(CurrentPage = 0; CurrentPage < PAGESTOREAD ; CurrentPage++)
     {
       for(ctr = 0; ctr < PAGESIZE; ctr++)
-      {
-          SensorData1[ctr] = 0;
-          SensorData2[ctr] = 0;
-
-      }
+          SensorData[ctr] = 0;
+      
       Mem_ReadFromMem();
       
       for(ctr = 0; ctr < 170; ctr++)
         for(int ctr2 = 0; ctr2 < 6; ctr2++)
-		UART_SendChar(SensorData2[(ctr*6)+ctr2]);
+		UART_SendChar(SensorData[(ctr*6)+ctr2]);
     }
     
     while(UCA1STAT & UCBUSY);

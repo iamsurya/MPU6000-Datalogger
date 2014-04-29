@@ -31,13 +31,12 @@ unsigned char PageAddress_L = 0;
 
 /* Variables for Main Program and to store Data */
 unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between Blink / No Blink modes, 2 = Switch Blink Frequencies, 3 = SPI reading*/
-signed char SensorData1[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
-signed char SensorData2[PAGESIZE]; 	/* Data received from Memory */
+signed char SensorData[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
 unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
 unsigned int ctr = 0;		/* Variable used for counters. Being Lazy */
 
 /* Timer for reading sensors */
-unsigned int BaseTime = 273; 	   /* Blinking frequency / timer on startup 0x1000 is 1 second */
+unsigned int BaseTime = 2184; 	   /* Blinking frequency / timer on startup 0x1000 is 1 second */
 unsigned char ReadingSensor = 0x00; /* Flag is set if Timer interrupts an SPI operation */
 
 /* Variables to store Timer Counts to evaluate communication times */
