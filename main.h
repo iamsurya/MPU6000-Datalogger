@@ -5,6 +5,7 @@
 
 /* General Defines */
 #define         LED             BIT0
+#define         BTN             BIT4            /* Button on P1.4 */
 
 /* SPI Pin defines */
 #define         nSS             BIT0    /* Enable Pin for Sensor */
@@ -23,6 +24,9 @@
 #define RS232_ESC       27
 #define ASCII0  0x30
 
+/* Variables for Button Debouncing */
+unsigned char debounce = 1;              /* 1 Not waiting for Debounce Timer 0 Button was pressed very soon */
+
 
 /* Variables for SPI */
 unsigned char read = 0;
@@ -34,6 +38,8 @@ unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between
 signed char SensorData[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
 unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
 unsigned int ctr = 0;		/* Variable used for counters. Being Lazy */
+unsigned char WritingMode = 0; /* 1 = Writing Sensor Data to Memory, 0 = Not Writing Data */
+unsigned char SwitchOn = 0; /* 1 = Writing Sensor Data to Memory, 0 = Not Writing Data */
 
 /* Timer for reading sensors */
 unsigned int BaseTime = 2184; 	   /* Blinking frequency / timer on startup 0x1000 is 1 second */

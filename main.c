@@ -1,6 +1,6 @@
 #include "main.h"
 
-#define READMEM 1                               /* Set to 1 if you want to read data from memory */
+#define READMEM 0                               /* Set to 1 if you want to read data from memory */
 
 #define TIMETOWRITE 60
 #define TIMETOREAD 60
@@ -27,9 +27,14 @@ void main(void)
   DCOCTL =  CALDCO_1MHZ;                /* Set DCO to 1MHz */
   __delay_cycles(200000);	// Delay 0.2 s to let clocks settle
   
-  /* Enable and Turn LED ON */
-  P1DIR |=LED;                          /* Set LED pin as Output */        
-  P1OUT |=LED;                          /* Set LED pin as HIGH */
+  /* Initialize Port 1 For LED and Button */
+  P1DIR |= LED;                 /* Set LED as output */
+  P1REN |= BTN;                 /* Enable Pullup / Pulldown on BTN pin */
+  P1OUT |= BTN;           /* Turn LED OFF Till the BTN is pressed, Pull up BTN pin */
+  P1OUT &= ~LED;            
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
+  P1IES |= BTN;                 /* Sensitive to (H->L) */
   
   /* Enable SPI */
   P5SEL |= (BIT1 + BIT2 + BIT3);        /* Peripheral function instead of I/O */
@@ -91,10 +96,6 @@ void main(void)
     /* Other Housekeepigng */
   __delay_cycles(8234);                 /* Delay 0.2s at 1Mhz to let clock settle */
   __enable_interrupt();
-  
-  /* Set timer to run */
-  TACCR0 = BaseTime;
-  TACCTL0 |= CCIE;
 
   /** Main Program **/
   
@@ -104,11 +105,42 @@ void main(void)
     
     if(ActionMode == 1)                 /* Long Buttton Press from old Timer Code */
     {
+      if((WritingMode == 1) && ((P1IN & BTN) == 0))
+      {
+        /* Disable Sensor Reading */
+        /* Set timer to disable */
+        TACCR0 = 0;
+        TACCTL0 &= ~CCIE;
+        P1OUT &= ~LED;
+        WritingMode = 0;
+        SwitchOn = 0;
+        __delay_cycles(656767);
+      }
+      else if((WritingMode == 0) && ((P1IN & BTN) == 0))
+      {
+        CurrentPage = 0;                /* Reset Memory count since device is off and LongPress */
+        ctr = 0;
+        JustDance();
+        SwitchOn = 0;
+        
+      }
+      else if (SwitchOn == 1)
+      {
+        TACCR0 += (BaseTime);
+        TACCTL0 |= CCIE;
+        P1OUT |= LED;
+        WritingMode = 1;
+        SwitchOn = 0;
+      }
       ActionMode = 0;  
     }
     
     if(ActionMode == 2)                 /* Short Button Press from old Timer Code */
     {
+      if(WritingMode == 0)              /* Device is off and shortpress */
+      {
+      SwitchOn = 1;
+      }
       ActionMode = 0;
     }    
     
@@ -170,58 +202,6 @@ void main(void)
   }
   
 }
-
-
-/**********************/
-/* Functions for Main */
-/**********************/
-
-
-/* Interrupt for TimerA Channel 0, runs short periodical*/
-#pragma vector = TIMERA0_VECTOR
-__interrupt void TA0V_ISR(void)
-{
-  __disable_interrupt();
-  BaseTime ^= 0x01;             /* Flip between 2184 and 2185 to average at 2184.5 */
-  TACCR0 += (BaseTime); /* Next Interrupt at given time */
-  ActionMode = 3;
-  if(ReadingSensor == 1)
-  {
-   JustDance(); 
-  }
-  __low_power_mode_off_on_exit();
-
-  __enable_interrupt();
-}
-
-
-void JustDance()
-{
-  P1OUT &= ~LED;                    /* Turn LED off if the WRONG WHO_AM_I response is received */
-    while(1)                          /* Trap device and give error code */
-    {
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off delay */
-      P1OUT ^= LED;
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on delay */
-      P1OUT ^= LED;                                                     
-    }
-  
-}
-
 
 /*********************/
 /* Code for MPU 6000 */
@@ -438,4 +418,123 @@ void UART_SendChar(unsigned char data)
 { 
   while(!(UC1IFG & UCA1TXIFG));
   UCA1TXBUF = data;  
+}
+
+
+
+
+/* Interrupt for TimerA Channel 0, runs short periods*/
+#pragma vector = TIMERA0_VECTOR
+__interrupt void TA0V_ISR(void)
+{
+  __disable_interrupt();
+  TACCR0 += (BaseTime); /* Next Interrupt at given time */
+  BaseTime ^= 0x01;             /* Flip between 2184 and 2185 to average at 2184.5 */
+  
+  ActionMode = 3;
+
+  if(ReadingSensor == 1)
+   JustDance(); 
+
+  __low_power_mode_off_on_exit();
+  P1IFG = 0;                    /* Changing P1 can change P1IFG */
+  __enable_interrupt();
+}
+
+
+
+/* Interrupt for Port 1 Button */
+#pragma vector = PORT1_VECTOR
+__interrupt void P1IV_ISR(void)
+{
+__disable_interrupt();  
+  
+  
+  P1IE &= ~BTN;                         /* Temporarily disable the interrupt (This is enabled after timer compares) */
+  switch(P1IFG)
+  {
+  case BTN:
+          if(debounce == 1)
+          {
+              debounce = 0;             /* Set debounce to 0 to indicate that timer needs to overflow before button can be read again */        
+              TACCR1 = TAR + 0x1800;    /* Timer 1 for half second later */
+              TACCTL1 = CCIE;           /* Enable Interrupt */        
+              TACCR2 = TAR+0x9000;      /* Timer 2 for long press */
+              TACCTL2 = CCIE;           /* Enable Timer 2 interrupt */
+          }
+          break;
+          
+  default: break;
+  }
+  
+  
+  P1IFG = 0; /* Clear any pending interrupts */
+  __enable_interrupt();
+}
+
+/* Interrupt for TimerA Channel 1 */
+#pragma vector = TIMERA1_VECTOR
+__interrupt void TAIV_ISR(void)
+{
+  
+__disable_interrupt();    
+  
+switch(TAIV)
+  {
+  
+  case TAIV_TACCR1:                     /* half a second has passed, so process the button command */
+          TACCR1 = 0;
+          TACCTL1 &= ~CCIE;
+          debounce = 1;                 /* half Seconds later, so we can say button has been debounced */
+          ActionMode = 2;               /* Action - Short Button Press */ 
+          __low_power_mode_off_on_exit();
+                 
+          break;
+          
+          
+  case TAIV_TACCR2:
+          /* 3 Seconds later after button press. */
+          /* Turn Channel 1 to off. */
+          
+          TACCTL2 &= ~CCIE;
+          TACCR2 = 0;
+          ActionMode = 1;               /* Action = Long Button Press */
+
+          debounce = 1; /* half Seconds later, so we can say button has been debounced */
+          __low_power_mode_off_on_exit();
+          
+            break;
+  default:  break; 
+  }
+ 
+  P1IE = BTN;
+  P1IFG = 0;  /* Writing to P1OUT can set P1IFG */
+  __enable_interrupt();
+}
+
+void JustDance()
+{
+  P1OUT &= ~LED;                    /* Turn LED off if the WRONG WHO_AM_I response is received */
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off delay */
+      P1OUT ^= LED;
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on delay */
+//      P1OUT ^= LED;                                                     
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
+  P1IES |= BTN;                 /* Sensitive to (H->L) */
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
 }
