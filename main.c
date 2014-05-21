@@ -407,7 +407,7 @@ void Mem_ReadAllBinary()
     while(UCA1STAT & UCBUSY);
     
     UCA1CTL1 |= UCSWRST;
-	
+
     
     JustDance();              // Trap program
 }
