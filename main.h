@@ -19,8 +19,8 @@
 #define PAGESIZE 1020 				/* PageSize for current Memory is set to 1024, but 6 * 170 = 1020, so we use this for all counters */
 
 /* UART Pins and vars */
-#define RXPIN   BIT7
-#define TXPIN   BIT6
+#define RXPIN   BIT5
+#define TXPIN   BIT4
 #define RS232_ESC       27
 #define ASCII0  0x30
 
@@ -54,7 +54,8 @@ unsigned int Time = 0;
 unsigned long ReadIndex = 0;
 char PhoneViewStart[] = "START 2014-21-04   07:30:20";
 char PhoneViewEnd[] = "END 2014-21-04   20:05:05";
-
+unsigned char UART_Working = 0;
+unsigned char UART_data[2];
 
 /* Functions */
 
@@ -120,15 +121,15 @@ void UART_SendValue2(unsigned char num);
 //  
 //}
 //
-//void UART_SendValue2(unsigned char num)
-//{
-//  unsigned char p = 0;
-//  p = (unsigned char) num / 10;
-//  UART_SendChar( p + ASCII0 );
-//  num = num - (p * 10);
-//  p = (unsigned char) num;
-//  UART_SendChar( p + ASCII0 );  
-//}
+void UART_SendValue2(unsigned char num)
+{
+  unsigned char p = 0;
+  p = (unsigned char) num / 10;
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 10);
+  p = (unsigned char) num;
+  UART_SendChar( p + ASCII0 );  
+}
 //
 //void UART_SendIndex(unsigned long num)
 //{

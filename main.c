@@ -54,13 +54,23 @@ void main(void)
   
   /* Read the Memory Device ID. Should be 1F */
   read = Mem_ReadID();
+
+//  Mem_ReadAllBinary();
+  /* Initialize UART */
+  P3DIR = TXPIN;
+  P3OUT = TXPIN;
+  P3SEL = TXPIN | RXPIN;
   
-  /* This Part of the Program executes only if READMEM is 1 */
-  if(READMEM)
-  {
-    Mem_ReadAllBinary();
-  }
+  /* Values from MSP430x24x Demo - USCI_A0, 115200 UART Echo ISR, DCO SMCLK */
   
+  UCA0CTL1 |= UCSSEL_2;                     // CLK = SMCLK
+  UCA0BR0 = 8;                           // 32kHz/9600 = 3.41
+  UCA0BR1 = 0x00;
+  UCA0MCTL = UCBRS2 + UCBRS0;               // Modulation UCBRSx = 3
+  UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
+  IE2 |= UCA0RXIE;                          // Enable USCI_A0 RX interrupt
+  /* End UART init */
+
   /* Disable I2C on the sensor */
   _Sensor_write(MPUREG_USER_CTRL, BIT_I2C_IF_DIS);
   
@@ -346,10 +356,10 @@ void Mem_BufferToPage()
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
 }
 
-void Mem_ReadFromMem()
+void Mem_ReadFromMem(unsigned int PageToRead)
 {
-  PageAddress_H = (unsigned char) (((CurrentPage<<2) & 0xFF00)>>8);
-  PageAddress_L = (unsigned char) (((CurrentPage<<2) & 0xFF));
+  PageAddress_H = (unsigned char) (((PageToRead<<2) & 0xFF00)>>8);
+  PageAddress_L = (unsigned char) (((PageToRead<<2) & 0xFF));
   
   P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
@@ -378,46 +388,35 @@ void Mem_ReadFromMem()
 void Mem_ReadAllBinary()
 {
 
-    /* Initialize UART */
-    P3DIR = TXPIN;
-    P3OUT = TXPIN;
-    P3SEL = TXPIN | RXPIN;
     
-    /* Values from MSP430x24x Demo - USCI_A0, 115200 UART Echo ISR, DCO SMCLK */
-    
-    UCA1CTL1 |= UCSSEL_2;                     // CLK = ACLK
-    UCA1BR0 = 8;                           // 32kHz/9600 = 3.41
-    UCA1BR1 = 0x00;
-    UCA1MCTL = UCBRS2 + UCBRS0;               // Modulation UCBRSx = 3
-    UCA1CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
-    /* End UART init */
- 
-    for(CurrentPage = 0; CurrentPage < PAGESTOREAD ; CurrentPage++)
+    //UART_SendValue2(CurrentPage);
+    for(int i = 0; i < CurrentPage ; i++)
     {
+      //UART_SendValue2(i);
       for(ctr = 0; ctr < PAGESIZE; ctr++)
           SensorData[ctr] = 0;
       
-      Mem_ReadFromMem();
+      Mem_ReadFromMem(i);
       
       for(ctr = 0; ctr < 170; ctr++)
         for(int ctr2 = 0; ctr2 < 6; ctr2++)
 		UART_SendChar(SensorData[(ctr*6)+ctr2]);
     }
     
-    while(UCA1STAT & UCBUSY);
+    while(UCA0STAT & UCBUSY);
     
-    UCA1CTL1 |= UCSWRST;
-
+    // UCA0CTL1 |= UCSWRST;
+	
     
-    JustDance();              // Trap program
+  //  JustDance();              // Trap program
 }
 
 
 
 void UART_SendChar(unsigned char data)
 { 
-  while(!(UC1IFG & UCA1TXIFG));
-  UCA1TXBUF = data;  
+  while(!(IFG2 & UCA0TXIFG));
+  UCA0TXBUF = data;  
 }
 
 
@@ -537,4 +536,27 @@ void JustDance()
   P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
   P1IES |= BTN;                 /* Sensitive to (H->L) */
   P1IFG = 0;                    /* Clear any interrupts on P1 */
+}
+
+// USCI A0/B0 Receive ISR
+#pragma vector=USCIAB0RX_VECTOR
+__interrupt void USCI0RX_ISR(void)
+{
+  
+__disable_interrupt();
+//UC1IE &= ~UCA1RXIE;                          // Disable RX interrupt
+UART_data[0] = UART_data[1];
+UART_data[1] = UCA0RXBUF;
+
+if(UART_data[0] == 's' && UART_data[1] == 'd')
+{
+  
+  UART_data[0] = 0x00;
+  UART_data[1] = 0x00;
+  Mem_ReadAllBinary();
+  
+  
+}
+__enable_interrupt();
+//UC1IE |= UCA1RXIE;                          // Enable  RX interrupt
 }
