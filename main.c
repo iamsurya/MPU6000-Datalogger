@@ -27,6 +27,8 @@ void main(void)
   DCOCTL =  CALDCO_1MHZ;                /* Set DCO to 1MHz */
   __delay_cycles(200000);	// Delay 0.2 s to let clocks settle
   
+  FCTL2 = FWKEY + FSSEL0 + FN1;             // MCLK/3 for Flash Timing Generator (0x0040u)  /* Flash clock select: 1 - MCLK */ Divided by 2.
+  
   /* Initialize Port 1 For LED and Button */
   P1DIR |= LED;                 /* Set LED as output */
   P1REN |= BTN;                 /* Enable Pullup / Pulldown on BTN pin */
@@ -129,6 +131,7 @@ void main(void)
       else if((WritingMode == 0) && ((P1IN & BTN) == 0))
       {
         CurrentPage = 0;                /* Reset Memory count since device is off and LongPress */
+        WritePageNumberToFlash();
         ctr = 0;
         JustDance();
         SwitchOn = 0;
@@ -188,10 +191,12 @@ void main(void)
           if(ctr >= PAGESIZE)   /* The Buffer is full */
           {
             __disable_interrupt();	/* Disable interrupts b/c the timer might interrupt otherwise */
+            ReadPageNumberFromFlash();
             StartTime = TAR;
             Mem_WriteToBuffer();	/* Write the stored SensorData to the Memory chip Buffer */
             Mem_BufferToPage();		/* Write the Buffer data to Page. Page Number is stored in Global CurrentPage */
             CurrentPage++;			/* Increment current page for next write */
+            WritePageNumberToFlash();
             ctr=0;					/* Reset ctr so its starts at 0 for next page */
             EndTime = TAR;
             Time = EndTime - StartTime;
@@ -506,7 +511,7 @@ switch(TAIV)
   default:  break; 
   }
  
-  P1IE = BTN;
+  P1IE |= BTN;
   P1IFG = 0;  /* Writing to P1OUT can set P1IFG */
   __enable_interrupt();
 }
@@ -559,4 +564,39 @@ if(UART_data[0] == 's' && UART_data[1] == 'd')
 }
 __enable_interrupt();
 //UC1IE |= UCA1RXIE;                          // Enable  RX interrupt
+}
+
+void ReadPageNumberFromFlash()
+{
+  char *Flash_ptr;                          // Flash pointer
+  unsigned char LSB,MSB;
+  
+  Flash_ptr = (char *)0x1040;              // Initialize Flash segment C ptr
+  MSB = *Flash_ptr++;                // Get Current Page number from the Flash location 0x1040
+  LSB = *Flash_ptr;
+  CurrentPage = (((unsigned int)MSB)<<8)+LSB;
+  __no_operation();                       // SET BREAKPOINT HERE
+}
+
+void WritePageNumberToFlash()
+{
+  char *Flash_ptr;                          // Flash pointer
+  unsigned char LSB,MSB;
+  Flash_ptr = (char *)0x1040;              // Initialize Flash segment C ptr
+  
+  FCTL3 = FWKEY;                            // Clear Lock bit
+  FCTL1 = FWKEY + ERASE;                    // Set Erase bit
+  *Flash_ptr = 0;                          // Dummy write to erase Flash seg D
+  FCTL1 = FWKEY + WRT;                      // Set WRT bit for write operation
+  
+  MSB = (unsigned char)((CurrentPage & 0xFF00u)>>8);
+  LSB = (unsigned char)(CurrentPage & 0xFF);
+  *Flash_ptr++ = MSB;
+  *Flash_ptr = LSB;
+  
+  __no_operation();                       // SET BREAKPOINT HERE
+  
+  FCTL1 = FWKEY;                            // Clear WRT bit
+  FCTL3 = FWKEY + LOCK;                     // Set LOCK bit
+  
 }

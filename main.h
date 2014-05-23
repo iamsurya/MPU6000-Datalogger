@@ -66,6 +66,8 @@ unsigned char _Sensor_read(unsigned char add);
 
 /* General */
 void JustDance();
+void ReadPageNumberFromFlash();
+void WritePageNumberToFlash();
 
 /* Memory */
 unsigned char MEM_TXRX(unsigned char data);
