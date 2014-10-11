@@ -5,8 +5,8 @@
 #define TIMETOWRITE 60
 #define TIMETOREAD 60
 
-#define PAGESTOWRITE 317 // (TIMETOWRITE * 5.5)
-#define PAGESTOREAD 317 //(TIMETOREAD * 5.5)
+#define PAGESTOWRITE 8189 // (TIMETOWRITE * 5.5)
+#define PAGESTOREAD 8189 //(TIMETOREAD * 5.5)
 
 
 /*
@@ -25,9 +25,11 @@ void main(void)
    /* Initialize DCO */
   BCSCTL1 = CALBC1_1MHZ;                /* Set DCO to 1MHz */
   DCOCTL =  CALDCO_1MHZ;                /* Set DCO to 1MHz */
-  __delay_cycles(200000);	// Delay 0.2 s to let clocks settle
+  __delay_cycles(200000);
+  debounce = 1;
   
   FCTL2 = FWKEY + FSSEL0 + FN1;             // MCLK/3 for Flash Timing Generator (0x0040u)  /* Flash clock select: 1 - MCLK */ Divided by 2.
+  SVSCTL = 0x80;                       /* SVS to set at 2.8V */
   
   /* Initialize Port 1 For LED and Button */
   P1DIR |= LED;                 /* Set LED as output */
@@ -53,7 +55,6 @@ void main(void)
   P5OUT |= nSS | mSS | SPI_SOMI | SPI_CLK;    /* Set pins to high */
   __delay_cycles(0x80);
   
-  
   /* Read the Memory Device ID. Should be 1F */
   read = Mem_ReadID();
 
@@ -62,7 +63,7 @@ void main(void)
   P3DIR = TXPIN;
   P3OUT = TXPIN;
   P3SEL = TXPIN | RXPIN;
-  
+
   /* Values from MSP430x24x Demo - USCI_A0, 115200 UART Echo ISR, DCO SMCLK */
   
   UCA0CTL1 |= UCSSEL_2;                     // CLK = SMCLK
@@ -78,10 +79,11 @@ void main(void)
   
   /* Check the Sensor Device ID */
   read = _Sensor_read(MPUREG_WHOAMI);
-  
-  /* Trap uC if Sensor doesn't ID correctly */
-  if(read != 0x68)  JustDance();                    /* Check WHOAMI Hopefully it is 0x68. Otherwise freak out. */
 
+  /* Trap uC if Sensor doesn't ID correctly */
+  if(read != 0x68) JustDance();                    /* Check WHOAMI Hopefully it is 0x68. Otherwise freak out. */
+
+ 
   /* Sensor might be sleeping, read Register with Sleep Bit, reset the bit and write it back */
   read = _Sensor_read(MPUREG_PWR_MGMT_1);
   _Sensor_write(MPUREG_PWR_MGMT_1, (read & ~BIT_SLEEP));/* Reset the Sleep Bit to wake it up */
@@ -103,11 +105,15 @@ void main(void)
   */
   TACTL = TACLR;
   __delay_cycles(8254); /* Delay by 0.2 seconds DELAY CYCLES USES DCO @ 1MHZ*/
-  TACTL = TASSEL_1 | MC_2;
+  TACTL = TASSEL_1 | MC_2; /* Run Timer on ACLK */
+
   
     /* Other Housekeepigng */
   __delay_cycles(8234);                 /* Delay 0.2s at 1Mhz to let clock settle */
   __enable_interrupt();
+
+  
+  OFFDANCE();
 
   /** Main Program **/
   
@@ -117,16 +123,18 @@ void main(void)
     
     if(ActionMode == 1)                 /* Long Buttton Press from old Timer Code */
     {
-      if((WritingMode == 1) && ((P1IN & BTN) == 0))
+      if(((WritingMode == 1) && ((P1IN & BTN) == 0)) || (FORCESTOP == 1))
       {
         /* Disable Sensor Reading */
         /* Set timer to disable */
+        FORCESTOP = 0;
         TACCR0 = 0;
         TACCTL0 &= ~CCIE;
-        P1OUT &= ~LED;
+        OFFDANCE();
         WritingMode = 0;
         SwitchOn = 0;
-        __delay_cycles(656767);
+        __enable_interrupt();
+        __delay_cycles(600);
       }
       else if((WritingMode == 0) && ((P1IN & BTN) == 0))
       {
@@ -141,7 +149,9 @@ void main(void)
       {
         TACCR0 += (BaseTime);
         TACCTL0 |= CCIE;
-        P1OUT |= LED;
+        ONDANCE();
+        
+        P1OUT &= ~LED;
         WritingMode = 1;
         SwitchOn = 0;
       }
@@ -191,6 +201,7 @@ void main(void)
           if(ctr >= PAGESIZE)   /* The Buffer is full */
           {
             __disable_interrupt();	/* Disable interrupts b/c the timer might interrupt otherwise */
+            P1OUT |= LED;
             ReadPageNumberFromFlash();
             StartTime = TAR;
             Mem_WriteToBuffer();	/* Write the stored SensorData to the Memory chip Buffer */
@@ -204,7 +215,7 @@ void main(void)
                 SensorData[actr] = 0;
             ReadingSensor = 0; /* Flag set to 0 b/c we're done with communication */
             ActionMode = 0;
-            
+            P1OUT &= ~LED;
             __enable_interrupt();	/* Enable Interrupts for the timer to start logging data again */
 
           }
@@ -256,15 +267,17 @@ unsigned char Sensor_TXRX(unsigned char add, unsigned char val)
   UCB1TXBUF = add;                      /* Send Address of Register  */
   while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
   while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */     
+ // while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   RXCHAR = UCB1RXBUF;                   /* Read what is RX to clear buffer / flags*/
   
   
   UCB1TXBUF = val;                      /* Write the val */      
   while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
   while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */  
+    
   RXCHAR = UCB1RXBUF;                     /* Read what is RX to clear buffer / flags*/
         
-
+  //while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   
   return RXCHAR;
 }
@@ -277,11 +290,13 @@ unsigned char MEM_TXRX(unsigned char data)
 {
   unsigned char RXCHAR = 0x00;
   while (!(UC1IFG & UCB1TXIFG));          /* Wait for TXBUF to be empty */
-  
+//  while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   UCB1TXBUF = data;                      /* Send Address of Register  */
   while(!(UC1IFG & UCB1TXIFG));           /* Wait for TXBUF to be empty (TXBUF data moves to the shift register) */
-  while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */     
+  while(!(UC1IFG & UCB1RXIFG));           /* Wait for RXBUF to be full */ 
+//  while(UCB1STAT & UCBUSY);             /* Wait for SPI to complete communication. Shouldn't be needed */
   RXCHAR = UCB1RXBUF;                   /* Read what is RX to clear buffer / flags*/
+//  while(UCB1STAT & UCBUSY);
   return RXCHAR;
   
 }
@@ -304,11 +319,9 @@ unsigned char Mem_ReadID()
 void Mem_WriteToBuffer()
 {
   P5OUT |= nSS;                         /* Deselect Sensor as SPI slave */ 
-//  __delay_cycles(100);
   P5OUT |= mSS;                         /* Deselect memory as SPI slave */ 
-//  __delay_cycles(1);
   P5OUT &= ~mSS;                        /* Select Memory as SPI Slave */
-//  __delay_cycles(100);
+
   MEM_TXRX(Buf1Write);                  /* Send the Buffer OpCode to the Memory */
   MEM_TXRX(0x00);                       /* Write 3 bytes of address. We starts at byte 0, so this is always 0 */
   MEM_TXRX(0x00);
@@ -394,10 +407,10 @@ void Mem_ReadAllBinary()
 {
 
     
-    //UART_SendValue2(CurrentPage);
+    
     for(int i = 0; i < CurrentPage ; i++)
     {
-      //UART_SendValue2(i);
+      
       for(ctr = 0; ctr < PAGESIZE; ctr++)
           SensorData[ctr] = 0;
       
@@ -410,10 +423,7 @@ void Mem_ReadAllBinary()
     
     while(UCA0STAT & UCBUSY);
     
-    // UCA0CTL1 |= UCSWRST;
-	
-    
-  //  JustDance();              // Trap program
+
 }
 
 
@@ -440,6 +450,15 @@ __interrupt void TA0V_ISR(void)
   if(ReadingSensor == 1)
    JustDance(); 
 
+  if( (SVSCTL & SVSFG) == SVSFG)
+  {
+    ActionMode = 1;
+    FORCESTOP = 1;
+  }
+  else
+  {
+    FORCESTOP = 0;
+  }
   __low_power_mode_off_on_exit();
   P1IFG = 0;                    /* Changing P1 can change P1IFG */
   __enable_interrupt();
@@ -471,8 +490,10 @@ __disable_interrupt();
   default: break;
   }
   
-  
-  P1IFG = 0; /* Clear any pending interrupts */
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
+  P1IES |= BTN;                 /* Sensitive to (H->L) */
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
   __enable_interrupt();
 }
 
@@ -511,9 +532,10 @@ switch(TAIV)
   default:  break; 
   }
  
-  P1IE |= BTN;
-  P1IFG = 0;  /* Writing to P1OUT can set P1IFG */
-  __enable_interrupt();
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
+  P1IES |= BTN;                 /* Sensitive to (H->L) */
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
 }
 
 void JustDance()
@@ -549,6 +571,7 @@ __interrupt void USCI0RX_ISR(void)
 {
   
 __disable_interrupt();
+ReadPageNumberFromFlash();
 //UC1IE &= ~UCA1RXIE;                          // Disable RX interrupt
 UART_data[0] = UART_data[1];
 UART_data[1] = UCA0RXBUF;
@@ -574,7 +597,7 @@ void ReadPageNumberFromFlash()
   Flash_ptr = (char *)0x1040;              // Initialize Flash segment C ptr
   MSB = *Flash_ptr++;                // Get Current Page number from the Flash location 0x1040
   LSB = *Flash_ptr;
-  CurrentPage = (((unsigned int)MSB)<<8)+LSB;
+  CurrentPage = (((unsigned int)MSB)<<8)+(unsigned int)LSB;
   __no_operation();                       // SET BREAKPOINT HERE
 }
 
@@ -599,4 +622,35 @@ void WritePageNumberToFlash()
   FCTL1 = FWKEY;                            // Clear WRT bit
   FCTL3 = FWKEY + LOCK;                     // Set LOCK bit
   
+}
+
+
+void OFFDANCE()
+{
+        P1OUT &= ~LED;
+        for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off delay */
+        P1OUT ^= LED;
+        for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
+        P1OUT ^= LED;
+        for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off */
+        P1OUT ^= LED;
+        for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
+        P1OUT ^= LED;
+        for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off */  
+}
+
+
+void ONDANCE()
+{
+  
+        P1OUT &= ~LED;
+        for(int i = 0; i<0x8FFF; i++);        /* Long LED off delay */
+        P1OUT ^= LED;
+        for(int i = 0; i<0x8FFF; i++);        /* Long LED on */
+        P1OUT ^= LED;
+        for(int i = 0; i<0x8FFF; i++);        /* Long LED off */
+        P1OUT ^= LED;
+        for(int i = 0; i<0x8FFF; i++);        /* Long LED on */
+        P1OUT ^= LED;
+        for(int i = 0; i<0x8FFF; i++);        /* Long LED off */  
 }
