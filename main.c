@@ -402,11 +402,26 @@ void Mem_ReadFromMem(unsigned int PageToRead)
 }
 
 
-/* Old function used when READMEM */
+/* Function that Dumps data to Computer over UART */
 void Mem_ReadAllBinary()
 {
-
+   /* Send the string nc to imply Number Correct */
+    UART_SendChar('n');
+    UART_SendChar('c');
     
+    
+    /* Send the actual Number of Pages */
+    ctr = CurrentPage & 0xFF;
+    UART_SendChar(ctr);
+    ctr = ((CurrentPage & 0xFF00) >> 8 );
+    UART_SendChar(ctr);
+    
+    UART_SendChar('S');
+    UART_SendChar('T');
+    UART_SendChar('A');
+    UART_SendChar('R');
+    UART_SendChar('T');
+    UART_SendChar('\n');
     
     for(int i = 0; i < CurrentPage ; i++)
     {

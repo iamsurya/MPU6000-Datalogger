@@ -92,6 +92,15 @@ void UART_SendIndex(unsigned long num);
 void UART_SendTime(unsigned long index);
 void UART_SendValue2(unsigned char num);
 
+void UART_SendValue2(unsigned char num)
+{
+  unsigned char p = 0;
+  p = (unsigned char) num / 10;
+  UART_SendChar( p + ASCII0 );
+  num = num - (p * 10);
+  p = (unsigned char) num;
+  UART_SendChar( p + ASCII0 );  
+}
 
 /******************************************/
 /*              Unwated Fn's              */
@@ -126,15 +135,7 @@ void UART_SendValue2(unsigned char num);
 //  
 //}
 //
-void UART_SendValue2(unsigned char num)
-{
-  unsigned char p = 0;
-  p = (unsigned char) num / 10;
-  UART_SendChar( p + ASCII0 );
-  num = num - (p * 10);
-  p = (unsigned char) num;
-  UART_SendChar( p + ASCII0 );  
-}
+
 //
 //void UART_SendIndex(unsigned long num)
 //{
