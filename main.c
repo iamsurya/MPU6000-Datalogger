@@ -411,9 +411,11 @@ void Mem_ReadAllBinary()
     
     
     /* Send the actual Number of Pages */
-    ctr = CurrentPage & 0xFF;
+    /* I use ***ReadingSensor*** here because I needed */
+    /* an unsigned char and did not want to create one */
+    ReadingSensor = CurrentPage & 0xFF;
     UART_SendChar(ctr);
-    ctr = ((CurrentPage & 0xFF00) >> 8 );
+    ReadingSensor = ((CurrentPage & 0xFF00) >> 8 );
     UART_SendChar(ctr);
     
     UART_SendChar('S');
@@ -588,10 +590,11 @@ __interrupt void USCI0RX_ISR(void)
 __disable_interrupt();
 ReadPageNumberFromFlash();
 //UC1IE &= ~UCA1RXIE;                          // Disable RX interrupt
+
 UART_data[0] = UART_data[1];
 UART_data[1] = UCA0RXBUF;
 
-if(UART_data[0] == 's' && UART_data[1] == 'd')
+if(UART_data[0] == 's' && UART_data[1] == 'd') /* sd = Send data to HOST PC */
 {
   
   UART_data[0] = 0x00;
@@ -600,6 +603,12 @@ if(UART_data[0] == 's' && UART_data[1] == 'd')
   
   
 }
+else if(UART_data[0] == 's' && UART_data[1] == 't') /* Sync Time with host PC */
+{
+  
+  
+}
+
 __enable_interrupt();
 //UC1IE |= UCA1RXIE;                          // Enable  RX interrupt
 }
