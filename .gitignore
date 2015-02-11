@@ -213,43 +213,5 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
-*.dep
-*.ewp
-*.wsdt
-*.bat
-*.dni
-*.dbgdt
-*.wsdt
-main - Copy.h
-settings/SPI.wsdt
-settings/SPI.wsdt
-SPI.dep
-SPI.ewp
-SPI.ewp
-SPI.dep
-settings/SPI.wsdt
-dataflash.c
-SPI.ewp
-SPI.dep
-SPI.dep
-SPI.ewp
-settings/SPI.wsdt
-*.wsdt
-*.wsdt
-settings/SPI.wsdt
-settings/SPI.wsdt
-SPI.dep
-SPI.ewd
-SPI.ewp
-SPI.dep
-SPI.dep
-SPI.dep
-SPI.ewp
-SPI.dep
-SPI.ewd
-main_old.c
-SPI.eww
-mainold.c
-Backup (2) of SPI.ewd
-Backup of SPI.ewd
-maincpy.c
+dataflash.h
+dump.mac
