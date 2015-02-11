@@ -23,3 +23,4 @@
 #define Buf2ToFlash		        0x89	// Buffer 2 to main memory page program without built-in erase
 #define PageErase                   0x81	// Page erase, added by Martin Thomas
 
+
