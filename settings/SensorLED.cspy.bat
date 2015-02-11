@@ -19,6 +19,6 @@
 @REM 
 
 
-"C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\common\bin\cspybat" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430proc.dll" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430sim.dll"  %1 --plugin "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430bat.dll" --backend -B "--hardware_multiplier" "16" "--hwmult_type" "2" "-p" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\config\MSP430F248.ddf" "--iv_base" "0xFFC0" "--odd_word_check" "-d" "sim" "--derivativeSim" "MSP430F248" 
+"C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\common\bin\cspybat" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430proc.dll" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430fet.dll"  %1 --plugin "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\bin\430bat.dll" --backend -B "--hardware_multiplier" "16" "--hwmult_type" "2" "-p" "C:\Program Files (x86)\IAR Systems\Embedded Workbench 6.5\430\config\MSP430F248.ddf" "--iv_base" "0xFFC0" "-d" "fet" "--erase_main" "--derivative" "MSP430F248" "--protocol" "4wire" "--eem" "EMEX_MEDIUM" "--port" "Automatic" "--connection" "ti_usb" "--use_emulated_breakpoints" "--settlingtime=0" "--msp430_dll" "msp430.dll" "--vccDefault" "3.3" "--jtag_speed" "medium" 
 
 

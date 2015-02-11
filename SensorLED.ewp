@@ -2011,7 +2011,13 @@
     </settings>
   </configuration>
   <file>
+    <name>$PROJ_DIR$\DevBoard.h</name>
+  </file>
+  <file>
     <name>$PROJ_DIR$\main.c</name>
+  </file>
+  <file>
+    <name>$PROJ_DIR$\mpu6000.h</name>
   </file>
 </project>
 
