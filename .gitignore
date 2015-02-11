@@ -224,3 +224,7 @@ settings/SPI.dni
 settings/SPI.wsdt
 settings/SPI.Debug.cspy.bat
 *.dep
+settings/SPI.Debug.cspy.bat
+settings/SPI.dni
+settings/SPI.wsdt
+SPI.dep
