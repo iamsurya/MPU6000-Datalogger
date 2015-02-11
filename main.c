@@ -438,6 +438,13 @@ void Mem_ReadAllBinary()
 		UART_SendChar(SensorData[(ctr*6)+ctr2]);
     }
     
+    UART_SendChar('D');
+    UART_SendChar('A');
+    UART_SendChar('T');
+    UART_SendChar('E');
+    UART_SendChar('N');
+    UART_SendChar('D');
+    
     while(UCA0STAT & UCBUSY);
     
 
@@ -588,29 +595,58 @@ __interrupt void USCI0RX_ISR(void)
 {
   
 __disable_interrupt();
-ReadPageNumberFromFlash();
-//UC1IE &= ~UCA1RXIE;                          // Disable RX interrupt
 
 UART_data[0] = UART_data[1];
-UART_data[1] = UCA0RXBUF;
+UART_data[1] = UART_data[2];
+UART_data[2] = UART_data[3];
+UART_data[3] = UART_data[4];
+UART_data[4] = UART_data[5];
+UART_data[5] = UCA0RXBUF;
+length++;
 
-if(UART_data[0] == 's' && UART_data[1] == 'd') /* sd = Send data to HOST PC */
+if(length > 5)
 {
-  
-  UART_data[0] = 0x00;
-  UART_data[1] = 0x00;
-  Mem_ReadAllBinary();
-  
-  
+if(UART_data[0] == 's')
+{
+  if( UART_data[1] == 'd' )
+  {
+
+    /* Reset the Received Command */
+    UART_data[0] = 0x00;
+    UART_data[1] = 0x00;
+    UART_data[2] = 0x00;
+    UART_data[3] = 0x00;
+    UART_data[4] = 0x00;
+    UART_data[5] = 0x00;
+    length = 0;
+    ReadPageNumberFromFlash();
+    Mem_ReadAllBinary();
+  }
 }
-else if(UART_data[0] == 's' && UART_data[1] == 't') /* Sync Time with host PC */
-{
-  
-  
+else if(UART_data[0] == 'T')
+  if(UART_data[1] == 'C') /*  Time synC with host computer */
+  {
+    TimeStamp = (unsigned long)UART_data[2] + ((unsigned long)UART_data[3] << 8) + ((unsigned long)UART_data[4] << 16) + ((unsigned long)UART_data[5] << 24);
+   
+    UART_SendChar(UART_data[5]);
+    UART_SendChar(UART_data[4]);
+    UART_SendChar(UART_data[3]);
+    UART_SendChar(UART_data[2]);
+ 
+    /* Reset the Received Command */
+    UART_data[0] = 0x00;
+    UART_data[1] = 0x00;
+    UART_data[2] = 0x00;
+    UART_data[3] = 0x00;
+    UART_data[4] = 0x00;
+    UART_data[5] = 0x00;
+    length = 0;
+  }
+
 }
 
 __enable_interrupt();
-//UC1IE |= UCA1RXIE;                          // Enable  RX interrupt
+
 }
 
 void ReadPageNumberFromFlash()

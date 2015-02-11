@@ -34,6 +34,7 @@ unsigned char PageAddress_H = 0;
 unsigned char PageAddress_L = 0;
 
 /* Variables for Main Program and to store Data */
+unsigned long TimeStamp = 0x00;
 unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between Blink / No Blink modes, 2 = Switch Blink Frequencies, 3 = SPI reading*/
 signed char SensorData[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
 unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
@@ -58,7 +59,10 @@ unsigned long ReadIndex = 0;
 char PhoneViewStart[] = "START 2014-21-04   07:30:20";
 char PhoneViewEnd[] = "END 2014-21-04   20:05:05";
 unsigned char UART_Working = 0;
-unsigned char UART_data[2];
+unsigned char UART_data[6];
+
+/* Variables for UART interrupt */
+unsigned char length;
 
 /* Functions */
 
