@@ -215,3 +215,12 @@ pip-log.txt
 .mr.developer.cfg
 dataflash.h
 dump.mac
+.ewt
+.dep
+.ewd
+.ewp
+settings/
+settings/SPI.dni
+settings/SPI.wsdt
+settings/SPI.Debug.cspy.bat
+*.dep
