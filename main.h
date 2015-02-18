@@ -24,6 +24,13 @@
 #define RS232_ESC       27
 #define ASCII0  0x30
 
+/* Flash memory locations */
+#define SEGDPTR 0x1000
+#define SEGCPTR 0x1040
+#define SEGBPTR 0x1080
+
+
+
 /* Variables for Button Debouncing */
 unsigned char debounce;              /* 1 Not waiting for Debounce Timer 0 Button was pressed very soon */
 
@@ -34,25 +41,29 @@ unsigned char PageAddress_H = 0;
 unsigned char PageAddress_L = 0;
 
 /* Variables for Main Program and to store Data */
-unsigned long TimeStamp = 0x00;
+unsigned long TimeStamp = 0x00;      /* TimeStamp of the current Time */
+unsigned long TimeStampInternal = 0x00; /* Time Stamp buffer used to send the time stamps */
+long *CurrentTimeStampPtr = (long *) SEGCPTR; 
 unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between Blink / No Blink modes, 2 = Switch Blink Frequencies, 3 = SPI reading*/
 signed char SensorData[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
 unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
 unsigned int ctr = 0;		/* Variable used for counters. Being Lazy */
 unsigned char WritingMode = 0; /* 1 = Writing Sensor Data to Memory, 0 = Not Writing Data */
 unsigned char SwitchOn = 0; /* 1 = Writing Sensor Data to Memory, 0 = Not Writing Data */
-unsigned char FORCESTOP = 0; 
+unsigned char FORCESTOP = 0; /* Used to Stop the device if battery is low */
 void ONDANCE();
 void OFFDANCE();
 
 /* Timer for reading sensors */
-unsigned int BaseTime = 2184; 	   /* Blinking frequency / timer on startup 0x1000 is 1 second */
+unsigned int BaseTime = 2184; 	   /* Blinking frequency */
 unsigned char ReadingSensor = 0x00; /* Flag is set if Timer interrupts an SPI operation */
 
 /* Variables to store Timer Counts to evaluate communication times */
 unsigned int StartTime = 0;
 unsigned int EndTime = 0;
 unsigned int Time = 0;
+void ResetTimeStampFromFlash();
+void SendTimeStamps();
 
 /* Variables for logging to UART */
 unsigned long ReadIndex = 0;

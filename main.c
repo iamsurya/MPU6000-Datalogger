@@ -5,8 +5,8 @@
 #define TIMETOWRITE 60
 #define TIMETOREAD 60
 
-#define PAGESTOWRITE 8189 // (TIMETOWRITE * 5.5)
-#define PAGESTOREAD 8189 //(TIMETOREAD * 5.5)
+#define PAGESTOWRITE 8189 
+#define PAGESTOREAD 8189 
 
 
 /*
@@ -28,7 +28,7 @@ void main(void)
   __delay_cycles(200000);
   debounce = 1;
   
-  FCTL2 = FWKEY + FSSEL0 + FN1;             // MCLK/3 for Flash Timing Generator (0x0040u)  /* Flash clock select: 1 - MCLK */ Divided by 2.
+  FCTL2 = FWKEY + FSSEL0 + FN1;         /* MCLK/3 for Flash Timing Generator (0x0040u)  | Flash clock select: 1 - MCLK | Divided by 2. */
   SVSCTL = 0x80;                       /* SVS to set at 2.8V */
   
   /* Initialize Port 1 For LED and Button */
@@ -106,7 +106,6 @@ void main(void)
   TACTL = TACLR;
   __delay_cycles(8254); /* Delay by 0.2 seconds DELAY CYCLES USES DCO @ 1MHZ*/
   TACTL = TASSEL_1 | MC_2; /* Run Timer on ACLK */
-
   
     /* Other Housekeepigng */
   __delay_cycles(8234);                 /* Delay 0.2s at 1Mhz to let clock settle */
@@ -139,6 +138,8 @@ void main(void)
       else if((WritingMode == 0) && ((P1IN & BTN) == 0))
       {
         CurrentPage = 0;                /* Reset Memory count since device is off and LongPress */
+        ResetTimeStampFromFlash();
+        /* You don't actually erase the memory, just the number of pages you've recorded and the TimeStampData */
         WritePageNumberToFlash();
         ctr = 0;
         JustDance();
@@ -160,9 +161,24 @@ void main(void)
     
     if(ActionMode == 2)                 /* Short Button Press from old Timer Code */
     {
-      if(WritingMode == 0)              /* Device is off and shortpress */
+      if(WritingMode == 0)              /* Device is off and Button was shortpress */
       {
-      SwitchOn = 1;
+      SwitchOn = 1;                     /* Turn the polling timer on */
+      }
+      else if (WritingMode == 1)        /* Device is on and Button was shortpress */
+      {
+                                       /* Store current Timestamp as marker */
+        
+      FCTL3 = FWKEY;                            /* Clear Lock bit */
+      FCTL1 = FWKEY + WRT;                      /* Set WRT bit for write operation */
+      
+      *CurrentTimeStampPtr = TimeStamp;
+      if(CurrentTimeStampPtr > (long *) 0x10BF)            /* Out of Memory for Time Stamps */
+      {
+        while(1)  JustDance();                  /* Keep blinking the LED */
+      }
+      FCTL1 = FWKEY;                            /* Clear WRT bit */
+      FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
       }
       ActionMode = 0;
     }    
@@ -412,7 +428,7 @@ void Mem_ReadAllBinary()
     
     /* Send the actual Number of Pages */
     /* I use ***ReadingSensor*** here because I needed */
-    /* an unsigned char and did not want to create one */
+    /* an unsigned char and did not want to create a new one */
     ReadingSensor = CurrentPage & 0xFF;
     UART_SendChar(ctr);
     ReadingSensor = ((CurrentPage & 0xFF00) >> 8 );
@@ -462,8 +478,10 @@ void UART_SendChar(unsigned char data)
 
 
 /* Interrupt for TimerA Channel 0, runs short periods*/
+/* This is the timer function that runs at 15Hz */
+/* It calls ActionMode 3, which reads sensors */
 #pragma vector = TIMERA0_VECTOR
-__interrupt void TA0V_ISR(void)
+__interrupt void PollTimer_ISR(void)
 {
   __disable_interrupt();
   TACCR0 += (BaseTime); /* Next Interrupt at given time */
@@ -488,11 +506,41 @@ __interrupt void TA0V_ISR(void)
   __enable_interrupt();
 }
 
+/* This function is called if LED's need to slow be blinked */
+/* Called when : the device is reset */
+/* The readsensor timer fires while sensors are being read */
+/* We are out of memory to store more data */
+void JustDance()
+{
+  P1OUT &= ~LED;                    /* Turn LED off if the WRONG WHO_AM_I response is received */
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off delay */
+      P1OUT ^= LED;
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
+      P1OUT ^= LED;
+      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
+      P1OUT ^= LED;
+      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on delay */
+//      P1OUT ^= LED;                                                     
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
+  P1IES |= BTN;                 /* Sensitive to (H->L) */
+  P1IFG = 0;                    /* Clear any interrupts on P1 */
+}
 
 
 /* Interrupt for Port 1 Button */
 #pragma vector = PORT1_VECTOR
-__interrupt void P1IV_ISR(void)
+__interrupt void ButtonPress_ISR(void)
 {
 __disable_interrupt();  
   
@@ -521,9 +569,11 @@ __disable_interrupt();
   __enable_interrupt();
 }
 
+
 /* Interrupt for TimerA Channel 1 */
+/* This interrupt deals with button presses and events */
 #pragma vector = TIMERA1_VECTOR
-__interrupt void TAIV_ISR(void)
+__interrupt void ButtonPressTimer_ISR(void)
 {
   
 __disable_interrupt();    
@@ -562,34 +612,7 @@ switch(TAIV)
   P1IFG = 0;                    /* Clear any interrupts on P1 */
 }
 
-void JustDance()
-{
-  P1OUT &= ~LED;                    /* Turn LED off if the WRONG WHO_AM_I response is received */
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED off delay */
-      P1OUT ^= LED;
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED off */
-      P1OUT ^= LED;
-      for(int i = 0; i<0x8FFF; i++);        /* Short LED on */
-      P1OUT ^= LED;
-      for(int j = 0; j<0x05; j++) for(int i = 0; i<0xFFFF; i++);        /* Long LED on delay */
-//      P1OUT ^= LED;                                                     
-  P1IFG = 0;                    /* Clear any interrupts on P1 */
-  P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
-  P1IES |= BTN;                 /* Sensitive to (H->L) */
-  P1IFG = 0;                    /* Clear any interrupts on P1 */
-}
-
-// USCI A0/B0 Receive ISR
+/* UART Recieve Interrupt */
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
@@ -624,14 +647,14 @@ if(UART_data[0] == 's')
   }
 }
 else if(UART_data[0] == 'T')
-  if(UART_data[1] == 'C') /*  Time synC with host computer */
+{  if(UART_data[1] == 'C') /*  Time synC with host computer */
   {
     TimeStamp = (unsigned long)UART_data[2] + ((unsigned long)UART_data[3] << 8) + ((unsigned long)UART_data[4] << 16) + ((unsigned long)UART_data[5] << 24);
-   
-    UART_SendChar(UART_data[5]);
-    UART_SendChar(UART_data[4]);
-    UART_SendChar(UART_data[3]);
+    
     UART_SendChar(UART_data[2]);
+    UART_SendChar(UART_data[3]);
+    UART_SendChar(UART_data[4]);
+    UART_SendChar(UART_data[5]);
  
     /* Reset the Received Command */
     UART_data[0] = 0x00;
@@ -642,45 +665,131 @@ else if(UART_data[0] == 'T')
     UART_data[5] = 0x00;
     length = 0;
   }
-
+}
+else if (UART_data[0] == 'C')
+{
+  if(UART_data[1] == 'T')
+  {
+    /* Store data LSB first */
+    UART_data[2] = (unsigned char) (TimeStamp & 0xFF);
+    UART_data[3] = (unsigned char) ((TimeStamp >> 8) & 0xFF);
+    UART_data[4] = (unsigned char) ((TimeStamp >> 16) & 0xFF);
+    UART_data[5] = (unsigned char) ((TimeStamp >> 24) & 0xFF);
+    
+    /* Send data LSB first */
+    UART_SendChar(UART_data[2]);
+    UART_SendChar(UART_data[3]);
+    UART_SendChar(UART_data[4]);
+    UART_SendChar(UART_data[5]);
+    __no_operation();
+  }
+  
+  
+  
+}
+else if (UART_data[0] == 's')
+{
+  if(UART_data[1] == 'T')
+  {
+    if(UART_data[2] == 'd')
+    {
+      SendTimeStamps();
+      __no_operation();
+    }
+  
+  }
+  
+}
 }
 
 __enable_interrupt();
 
 }
 
-void ReadPageNumberFromFlash()
+void SendTimeStamps()
 {
-  char *Flash_ptr;                          // Flash pointer
-  unsigned char LSB,MSB;
   
-  Flash_ptr = (char *)0x1040;              // Initialize Flash segment C ptr
-  MSB = *Flash_ptr++;                // Get Current Page number from the Flash location 0x1040
-  LSB = *Flash_ptr;
-  CurrentPage = (((unsigned int)MSB)<<8)+(unsigned int)LSB;
-  __no_operation();                       // SET BREAKPOINT HERE
+  /* Do this for 32 values starting at Seg C Ptr */
+  
+      /* Store data LSB first */
+      UART_data[2] = (unsigned char)  (TimeStampInternal & 0xFF);
+      UART_data[3] = (unsigned char) ((TimeStampInternal >> 8) & 0xFF);
+      UART_data[4] = (unsigned char) ((TimeStampInternal >> 16) & 0xFF);
+      UART_data[5] = (unsigned char) ((TimeStampInternal >> 24) & 0xFF);
+      
+      /* Send data LSB first */
+      UART_SendChar(UART_data[2]);
+      UART_SendChar(UART_data[3]);
+      UART_SendChar(UART_data[4]);
+      UART_SendChar(UART_data[5]);
+  
+  
+}
+void ResetTimeStampFromFlash()
+{
+        /* Erase Segment B */
+        CurrentTimeStampPtr = (long *) SEGBPTR;  
+        FCTL3 = FWKEY;                            /* Clear Lock bit */
+        FCTL1 = FWKEY + ERASE;                    /* Set Erase bit  */
+        *CurrentTimeStampPtr = 0;                 /* Dummy write to erase Flash seg D */  
+        FCTL1 = FWKEY;                            /* Clear WRT bit */
+        FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
+        
+        /* Erase Segment C */
+        CurrentTimeStampPtr = (long *) SEGCPTR;  
+        FCTL3 = FWKEY;                            /* Clear Lock bit */
+        FCTL1 = FWKEY + ERASE;                    /* Set Erase bit  */
+        *CurrentTimeStampPtr = 0;                 /* Dummy write to erase Flash seg D */  
+        FCTL1 = FWKEY;                            /* Clear WRT bit */
+        FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
+        
+        /* The CurrentTimerStampPtr points to SEGCPTR, which is where it should be */
+        
 }
 
+
+/** This function writes the current TimeStamp to Flash Memory */
+/** Called when user taps the button while device is recording data */
+void WriteTimeStampToFlash()
+{
+    
+}
+                         
+
+/* Read the current Page Number from Flash memory */
+void ReadPageNumberFromFlash()
+{
+  char *Flash_ptr;                          /* Pointer to the flash memory */
+  unsigned char LSB,MSB;
+  
+  Flash_ptr = (char *) SEGDPTR;             /* Initialize Flash segment C ptr */
+  MSB = *Flash_ptr++;                       /*  Get Current Page number from the Flash location 0x1040 */
+  LSB = *Flash_ptr;
+  CurrentPage = (((unsigned int)MSB)<<8)+(unsigned int)LSB;
+  
+}
+
+/* Write the current Page number to Flash Memory */
 void WritePageNumberToFlash()
 {
-  char *Flash_ptr;                          // Flash pointer
+  char *Flash_ptr;                          /* Pointer to the flash memory */
   unsigned char LSB,MSB;
-  Flash_ptr = (char *)0x1040;              // Initialize Flash segment C ptr
+  Flash_ptr = (char *) SEGDPTR;         /* Initialize Flash segment D ptr */
   
-  FCTL3 = FWKEY;                            // Clear Lock bit
-  FCTL1 = FWKEY + ERASE;                    // Set Erase bit
-  *Flash_ptr = 0;                          // Dummy write to erase Flash seg D
-  FCTL1 = FWKEY + WRT;                      // Set WRT bit for write operation
+  FCTL3 = FWKEY;                            /* Clear Lock bit */
+  FCTL1 = FWKEY + ERASE;                    /* Set Erase bit  */
+  *Flash_ptr = 0;                           /* Dummy write to erase Flash seg D */
+  FCTL1 = FWKEY + WRT;                      /* Set WRT bit for write operation */
   
   MSB = (unsigned char)((CurrentPage & 0xFF00u)>>8);
   LSB = (unsigned char)(CurrentPage & 0xFF);
   *Flash_ptr++ = MSB;
   *Flash_ptr = LSB;
   
-  __no_operation();                       // SET BREAKPOINT HERE
   
-  FCTL1 = FWKEY;                            // Clear WRT bit
-  FCTL3 = FWKEY + LOCK;                     // Set LOCK bit
+  
+  FCTL1 = FWKEY;                            /* Clear WRT bit */
+  FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
   
 }
 
