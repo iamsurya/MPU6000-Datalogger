@@ -28,7 +28,7 @@
 #define SEGDPTR 0x1000
 #define SEGCPTR 0x1040
 #define SEGBPTR 0x1080
-
+#define SEGBLAST 0x10BF
 
 
 /* Variables for Button Debouncing */
@@ -44,7 +44,7 @@ unsigned char PageAddress_L = 0;
 unsigned long TimeStamp = 0x00;      /* TimeStamp of the current Time */
 unsigned long TimeStampInternal = 0x00; /* Time Stamp buffer used to send the time stamps */
 long *CurrentTimeStampPtr = (long *) SEGCPTR; 
-unsigned char ActionMode = 0;       /* ActionModes: 0 = LPM3, 1 = Switch between Blink / No Blink modes, 2 = Switch Blink Frequencies, 3 = SPI reading*/
+unsigned char ActionMode = 0;       /* ActionModes: 3:Reads sensor data (and dumps to extmemory if needed) 1: 2: */
 signed char SensorData[PAGESIZE]; 	/* Stores data to output to Memory. Size of Buffer and Block on Memory is PAGESIZE bytes by default */
 unsigned int CurrentPage = 0;		/* The current page number we are reading or writing */
 unsigned int ctr = 0;		/* Variable used for counters. Being Lazy */
@@ -57,12 +57,16 @@ void OFFDANCE();
 /* Timer for reading sensors */
 unsigned int BaseTime = 2184; 	   /* Blinking frequency */
 unsigned char ReadingSensor = 0x00; /* Flag is set if Timer interrupts an SPI operation */
+unsigned int TimerB1Second = 32767; /* Timer B is divided by 8, so 4096 is 1 second */
 
-/* Variables to store Timer Counts to evaluate communication times */
+
+/* Variables to store Timer data*/
 unsigned int StartTime = 0;
 unsigned int EndTime = 0;
 unsigned int Time = 0;
+unsigned char RecordTimeStamp = 0;
 void ResetTimeStampFromFlash();
+void WriteTimeStampToMemory();
 void SendTimeStamps();
 
 /* Variables for logging to UART */

@@ -29,7 +29,7 @@ void main(void)
   debounce = 1;
   
   FCTL2 = FWKEY + FSSEL0 + FN1;         /* MCLK/3 for Flash Timing Generator (0x0040u)  | Flash clock select: 1 - MCLK | Divided by 2. */
-  SVSCTL = 0x80;                       /* SVS to set at 2.8V */
+  SVSCTL = 0xA0;                       /* SVS to set at 3.05V */
   
   /* Initialize Port 1 For LED and Button */
   P1DIR |= LED;                 /* Set LED as output */
@@ -105,7 +105,18 @@ void main(void)
   */
   TACTL = TACLR;
   __delay_cycles(8254); /* Delay by 0.2 seconds DELAY CYCLES USES DCO @ 1MHZ*/
-  TACTL = TASSEL_1 | MC_2; /* Run Timer on ACLK */
+  TACTL = TASSEL_1 | MC_2; /* Run Timer on ACLK Continuous mode.*/
+  
+  /* 
+  ** TimerB for Time keeping, tracks the time on the microcontroller 
+  ** This does not start the timer (Set mode to not 0, and have not zero value in TACCR0)).
+  ** The Timer is started whenever time is synced with the device */
+  
+  
+  TBCTL = TBCLR;
+  __delay_cycles(8254); /* Delay by 0.2 seconds DELAY CYCLES USES DCO @ 1MHZ*/
+  TBCTL = TBSSEL_1 | MC_2 ; /* Run Timer on ACLK, Continuous mode. */ 
+
   
     /* Other Housekeepigng */
   __delay_cycles(8234);                 /* Delay 0.2s at 1Mhz to let clock settle */
@@ -132,6 +143,7 @@ void main(void)
         OFFDANCE();
         WritingMode = 0;
         SwitchOn = 0;
+        WriteTimeStampToMemory();
         __enable_interrupt();
         __delay_cycles(600);
       }
@@ -146,39 +158,42 @@ void main(void)
         SwitchOn = 0;
         
       }
-      else if (SwitchOn == 1)
+      else if (SwitchOn == 1)      /* Device needs to be switched on */
       {
         TACCR0 += (BaseTime);
         TACCTL0 |= CCIE;
         ONDANCE();
-        
+        WriteTimeStampToMemory();
         P1OUT &= ~LED;
         WritingMode = 1;
         SwitchOn = 0;
       }
+      else if (RecordTimeStamp == 1)
+      {
+        WriteTimeStampToMemory();
+        
+        
+      }
       ActionMode = 0;  
     }
     
-    if(ActionMode == 2)                 /* Short Button Press from old Timer Code */
+    if(ActionMode == 2)                 /* Short Button Press Action Mode. Understand that the long timer will fire after this, and that means Action Mode 1 will be activated too. */
     {
       if(WritingMode == 0)              /* Device is off and Button was shortpress */
       {
-      SwitchOn = 1;                     /* Turn the polling timer on */
+        SwitchOn = 1;                     /* Turn the polling timer on */
+        RecordTimeStamp = 0;
       }
+      /* Maybe you want to move thie to Action Mode 1, just like the Switching on process is    */
+      /*                                                                                        */
+      /*                                                                                        */
+      /*                                                                                        */
       else if (WritingMode == 1)        /* Device is on and Button was shortpress */
       {
                                        /* Store current Timestamp as marker */
         
-      FCTL3 = FWKEY;                            /* Clear Lock bit */
-      FCTL1 = FWKEY + WRT;                      /* Set WRT bit for write operation */
-      
-      *CurrentTimeStampPtr = TimeStamp;
-      if(CurrentTimeStampPtr > (long *) 0x10BF)            /* Out of Memory for Time Stamps */
-      {
-        while(1)  JustDance();                  /* Keep blinking the LED */
-      }
-      FCTL1 = FWKEY;                            /* Clear WRT bit */
-      FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
+        SwitchOn = 0;
+        RecordTimeStamp = 1;
       }
       ActionMode = 0;
     }    
@@ -430,9 +445,9 @@ void Mem_ReadAllBinary()
     /* I use ***ReadingSensor*** here because I needed */
     /* an unsigned char and did not want to create a new one */
     ReadingSensor = CurrentPage & 0xFF;
-    UART_SendChar(ctr);
+    UART_SendChar(ReadingSensor);
     ReadingSensor = ((CurrentPage & 0xFF00) >> 8 );
-    UART_SendChar(ctr);
+    UART_SendChar(ReadingSensor);
     
     UART_SendChar('S');
     UART_SendChar('T');
@@ -585,7 +600,7 @@ switch(TAIV)
           TACCR1 = 0;
           TACCTL1 &= ~CCIE;
           debounce = 1;                 /* half Seconds later, so we can say button has been debounced */
-          ActionMode = 2;               /* Action - Short Button Press */ 
+          ActionMode = 2;               /* Action Timer for Short Button Press */ 
           __low_power_mode_off_on_exit();
                  
           break;
@@ -597,7 +612,7 @@ switch(TAIV)
           
           TACCTL2 &= ~CCIE;
           TACCR2 = 0;
-          ActionMode = 1;               /* Action = Long Button Press */
+          ActionMode = 1;               /* Action = Timer for Long Button Press */
 
           debounce = 1; /* half Seconds later, so we can say button has been debounced */
           __low_power_mode_off_on_exit();
@@ -610,6 +625,19 @@ switch(TAIV)
   P1IE  |= BTN;                 /* Set BTN as intterupt (default P1IES sets low to high )*/
   P1IES |= BTN;                 /* Sensitive to (H->L) */
   P1IFG = 0;                    /* Clear any interrupts on P1 */
+}
+
+
+/* Timer that increments time */
+/* Executes every 1 second */
+#pragma vector = TIMERB0_VECTOR
+__interrupt void RealTimeTimer_ISR(void)
+{
+  __disable_interrupt(); 
+  TimeStamp++;  
+  TBCCR0 += TimerB1Second;
+  
+  __enable_interrupt();
 }
 
 /* UART Recieve Interrupt */
@@ -629,6 +657,7 @@ length++;
 
 if(length > 5)
 {
+// Command Send Time
 if(UART_data[0] == 's')
 {
   if( UART_data[1] == 'd' )
@@ -646,6 +675,7 @@ if(UART_data[0] == 's')
     Mem_ReadAllBinary();
   }
 }
+// TC Command Time Sync
 else if(UART_data[0] == 'T')
 {  if(UART_data[1] == 'C') /*  Time synC with host computer */
   {
@@ -655,7 +685,14 @@ else if(UART_data[0] == 'T')
     UART_SendChar(UART_data[3]);
     UART_SendChar(UART_data[4]);
     UART_SendChar(UART_data[5]);
- 
+
+    /* Reset the page number */
+    CurrentPage = 0;                /* Reset Memory count since device is off and LongPress */
+    ResetTimeStampFromFlash();
+    /* You don't actually erase the memory, just the number of pages you've recorded and the TimeStampData */
+    WritePageNumberToFlash();
+    
+    
     /* Reset the Received Command */
     UART_data[0] = 0x00;
     UART_data[1] = 0x00;
@@ -664,12 +701,22 @@ else if(UART_data[0] == 'T')
     UART_data[4] = 0x00;
     UART_data[5] = 0x00;
     length = 0;
+    
+    /* Enable Timer B, which tracks the time and its interrupt*/
+    TBCCR0 += TimerB1Second;
+    TBCCTL0 |= CCIE;
   }
 }
+// Command CT Check Time
 else if (UART_data[0] == 'C')
 {
   if(UART_data[1] == 'T')
   {
+    /* Reset the Received Command */
+    UART_data[0] = 0x00;
+    UART_data[1] = 0x00;
+    length = 0;
+    
     /* Store data LSB first */
     UART_data[2] = (unsigned char) (TimeStamp & 0xFF);
     UART_data[3] = (unsigned char) ((TimeStamp >> 8) & 0xFF);
@@ -687,19 +734,44 @@ else if (UART_data[0] == 'C')
   
   
 }
-else if (UART_data[0] == 's')
-{
-  if(UART_data[1] == 'T')
+// Command DsT for Sending Time Stamp Data
+else if (UART_data[0] == 'D')
   {
-    if(UART_data[2] == 'd')
+    if(UART_data[1] == 's')
     {
-      SendTimeStamps();
-      __no_operation();
+      if(UART_data[2] == 'T')
+      {
+      /* Reset the Received Command */
+      UART_data[0] = 0x00;
+      UART_data[1] = 0x00;
+      UART_data[2] = 0x00;
+      UART_data[3] = 0x00;
+      UART_data[4] = 0x00;
+      UART_data[5] = 0x00;
+      length = 0;
+      
+        SendTimeStamps();
+        __no_operation();
+      }
+    
     }
-  
+    
   }
-  
-}
+// Command RSt for Reset
+else if (UART_data[0] == 'R')
+  {
+      if(UART_data[1] == 'S')
+      {
+        if(UART_data[2] == 't')
+        {
+          WDTCTL = WDT_MRST_0_064; while(1);  // watchdog reset, resets device. MSP430 FAQ Webpage.
+          
+        }
+        
+        
+      }
+    
+  }
 }
 
 __enable_interrupt();
@@ -710,19 +782,20 @@ void SendTimeStamps()
 {
   
   /* Do this for 32 values starting at Seg C Ptr */
-  
+      for(long * longptr = (long *) SEGCPTR; longptr< (long *) SEGBLAST; longptr++)
+      {
       /* Store data LSB first */
-      UART_data[2] = (unsigned char)  (TimeStampInternal & 0xFF);
-      UART_data[3] = (unsigned char) ((TimeStampInternal >> 8) & 0xFF);
-      UART_data[4] = (unsigned char) ((TimeStampInternal >> 16) & 0xFF);
-      UART_data[5] = (unsigned char) ((TimeStampInternal >> 24) & 0xFF);
+      UART_data[2] = (unsigned char)  ((*longptr) & 0xFF);
+      UART_data[3] = (unsigned char) (((*longptr) >> 8) & 0xFF);
+      UART_data[4] = (unsigned char) (((*longptr) >> 16) & 0xFF);
+      UART_data[5] = (unsigned char) (((*longptr) >> 24) & 0xFF);
       
       /* Send data LSB first */
       UART_SendChar(UART_data[2]);
       UART_SendChar(UART_data[3]);
       UART_SendChar(UART_data[4]);
       UART_SendChar(UART_data[5]);
-  
+      }
   
 }
 void ResetTimeStampFromFlash()
@@ -750,9 +823,18 @@ void ResetTimeStampFromFlash()
 
 /** This function writes the current TimeStamp to Flash Memory */
 /** Called when user taps the button while device is recording data */
-void WriteTimeStampToFlash()
+void WriteTimeStampToMemory()
 {
-    
+        FCTL3 = FWKEY;                            /* Clear Lock bit */
+        FCTL1 = FWKEY + WRT;                      /* Set WRT bit for write operation */
+        
+        *CurrentTimeStampPtr++ = TimeStamp;
+        if(CurrentTimeStampPtr > (long *) SEGBLAST)            /* Out of Memory for Time Stamps */
+        {
+          while(1)  JustDance();                  /* Keep blinking the LED */
+        }
+        FCTL1 = FWKEY;                            /* Clear WRT bit */
+        FCTL3 = FWKEY + LOCK;                     /* Set LOCK bit */
 }
                          
 
