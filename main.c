@@ -153,6 +153,7 @@ void main(void)
         ResetTimeStampFromFlash();
         /* You don't actually erase the memory, just the number of pages you've recorded and the TimeStampData */
         WritePageNumberToFlash();
+        FORCESTOP = 0;
         ctr = 0;
         JustDance();
         SwitchOn = 0;
