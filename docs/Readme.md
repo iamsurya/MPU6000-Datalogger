@@ -21,5 +21,7 @@ See [Bite Counter project](http://cecas.clemson.edu/~ahoover/bite-counter/) for 
 	- Files for this readme
     
 ## Final Prototype
-The final prototype was housed in a plastic body as shown in docs/FinalDev.jpg
-![Final Prototype]({{site.baseurl}}/https://github.com/iamsurya/MPU6000-Datalogger/blob/master/docs/FinalDev.jpg?raw=true)
+A final prototype was built using OSHPark's PCB service, and parts were soldered using a hot skillet. See slides for details.
+The device was housed in a plastic body as shown in docs/FinalDev.jpg
+
+![](https://raw.githubusercontent.com/iamsurya/MPU6000-Datalogger/master/docs/FinalDev.jpg)
